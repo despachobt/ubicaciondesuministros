@@ -71,13 +71,24 @@
   <ul id="cercanos" class="list-group small mb-3"></ul>
 
   <h6>🕑 Historial (últimos 3):</h6>
-  <ul id="historial" class="list-group small"></ul>
+  <ul id="historial" class="list-group small mb-3"></ul>
+
+  <!-- 🔹 Nueva barra de búsqueda para SED -->
+  <h4>📡 Buscar SED</h4>
+  <div class="input-group mb-2">
+    <input type="text" id="searchSED" class="form-control" placeholder="Nombre de SED">
+    <button class="btn btn-warning" onclick="buscarSED()">Buscar</button>
+  </div>
+  <div id="resultadoSED" class="text-primary mb-2"></div>
+  <h6>🔎 Suministros cercanos al SED:</h6>
+  <ul id="cercanosSED" class="list-group small mb-3"></ul>
 </div>
 <div id="map"></div>
 
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script>
 let datos = [];
+let sedDatos = []; // 🔹 Nuevo array para SED
 let ultimoEncontro = null;
 let map, marker;
 let historial = [];
@@ -117,12 +128,11 @@ function actualizarProgreso(){
     li.textContent = "✅ Todos los archivos cargados con éxito.";
     document.getElementById("progreso").appendChild(li);
 
-    // 🔥 Ocultar después de 2s
     setTimeout(()=>{ document.getElementById("progresoBox").style.display="none"; }, 2000);
   }
 }
 
-// Cargar CSV
+// Cargar CSV de suministros
 urls.forEach(f => {
   fetch(f.url)
     .then(r => r.text())
@@ -153,6 +163,28 @@ urls.forEach(f => {
     });
 });
 
+// 🔹 Cargar CSV de SED
+fetch("https://dl.dropboxusercontent.com/scl/fi/f27szlfjhlid5luse9j7y/SED.csv?rlkey=kmmfa1sawvl73b2wcdn2exrg4")
+  .then(r => r.text())
+  .then(texto => {
+    const lineas = texto.trim().split(/\r?\n/);
+    lineas.slice(1).forEach(l => {
+      const cols = l.split(",");
+      if(cols.length >= 7){
+        sedDatos.push({
+          sed: cols[0].trim().toUpperCase(),   // 👈 limpiamos y pasamos a mayúsculas
+          alim: cols[1].trim(),
+          clientesBT: cols[2].trim(),
+          tipo: cols[3].trim(),
+          ut: cols[4].trim(),
+          lon: parseFloat(cols[5].replace(",", ".").trim()),
+          lat: parseFloat(cols[6].replace(",", ".").trim())
+        });
+      }
+    });
+  });
+
+// Buscar suministro
 function buscarSuministro(){
   if(cargados < urls.length){
     document.getElementById('resultado').textContent = "⚠️ Espera a que termine la carga.";
@@ -167,12 +199,10 @@ function buscarSuministro(){
     document.getElementById('verEnGoogle').style.display = 'inline';
     actualizarMapa(encontrado.lat, encontrado.lon, encontrado);
 
-    // Historial (máx 3 últimos)
     historial.unshift(encontrado);
     if(historial.length > 3) historial.pop();
     renderHistorial();
 
-    // Cercanos <20m y solo 5 más cercanos
     const cercanos = datos
       .filter(d => d !== encontrado)
       .map(d => ({...d, dist: getDistance(encontrado.lat, encontrado.lon, d.lat, d.lon)}))
@@ -186,6 +216,32 @@ function buscarSuministro(){
     document.getElementById('verEnGoogle').style.display = 'none';
     document.getElementById('cercanos').innerHTML = '';
     document.getElementById('historial').innerHTML = '';
+  }
+}
+
+// 🔹 Buscar SED
+function buscarSED(){
+  const nombre = document.getElementById("searchSED").value.trim().toUpperCase();
+  const encontrado = sedDatos.find(d => d.sed === nombre);
+  if(encontrado){
+    document.getElementById('resultadoSED').innerHTML =
+      `✅ <b>SED:</b> ${encontrado.sed}<br>
+       <b>ALIM:</b> ${encontrado.alim}<br>
+       <b>Clientes BT:</b> ${encontrado.clientesBT}<br>
+       <b>Tipo:</b> ${encontrado.tipo}<br>
+       <b>UT:</b> ${encontrado.ut}`;
+    actualizarMapa(encontrado.lat, encontrado.lon, encontrado);
+ 
+// 🔹 Calcular suministros cercanos al SED
+    const cercanos = datos
+      .map(d => ({...d, dist: getDistance(encontrado.lat, encontrado.lon, d.lat, d.lon)}))
+      .sort((a,b) => a.dist - b.dist)
+      .slice(0,5);
+
+    renderCercanosSED(cercanos);
+  } else {
+    document.getElementById('resultadoSED').textContent = "❌ SED no encontrado";
+    document.getElementById('cercanosSED').innerHTML = '';
   }
 }
 
@@ -222,6 +278,18 @@ function renderCercanos(lista){
   });
 }
 
+// 🔹 Render cercanos a un SED
+function renderCercanosSED(lista){
+  const ul = document.getElementById("cercanosSED");
+  ul.innerHTML = "";
+  lista.forEach(c => {
+    const li = document.createElement("li");
+    li.className = "list-group-item fade-in";
+    li.textContent = `Cliente ${c.cliente} - ${(c.dist*1000).toFixed(1)} m`;
+    ul.appendChild(li);
+  });
+}
+
 function actualizarMapa(lat, lon, encontrado){
   if (!map){
     map = L.map('map').setView([lat, lon], 15);
@@ -230,8 +298,12 @@ function actualizarMapa(lat, lon, encontrado){
     }).addTo(map);
   }
   if(marker) map.removeLayer(marker);
-  marker = L.marker([lat, lon], {title:"Cliente " + encontrado.cliente}).addTo(map);
-  marker.bindTooltip("Cliente: " + encontrado.cliente + "<br>UT: " + encontrado.ut).openTooltip();
+  marker = L.marker([lat, lon], {title:(encontrado.cliente ? "Cliente " + encontrado.cliente : "SED " + encontrado.sed)}).addTo(map);
+  if(encontrado.cliente){
+    marker.bindTooltip("Cliente: " + encontrado.cliente + "<br>UT: " + encontrado.ut).openTooltip();
+  } else {
+    marker.bindTooltip("SED: " + encontrado.sed + "<br>UT: " + encontrado.ut).openTooltip();
+  }
   map.setView([lat, lon], 17, {animate:true});
 }
 
