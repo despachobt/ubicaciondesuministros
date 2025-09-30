@@ -80,7 +80,8 @@
     <button class="btn btn-warning" onclick="buscarSED()">Buscar</button>
   </div>
   <div id="resultadoSED" class="text-primary mb-2"></div>
-  <h6>🔎 Suministros cercanos al SED:</h6>
+  <button id="verEnGoogleSED" class="btn btn-outline-warning btn-sm mb-3" style="display:none" onclick="abrirEnGoogleMapsSED()">Ver en Google Maps</button>
+  <h6>🔎 Suministros cercanos al SED (&lt;20m):</h6>
   <ul id="cercanosSED" class="list-group small mb-3"></ul>
 </div>
 <div id="map"></div>
@@ -90,6 +91,7 @@
 let datos = [];
 let sedDatos = []; // 🔹 Nuevo array para SED
 let ultimoEncontro = null;
+let ultimaSED = null;
 let map, marker;
 let historial = [];
 let cercanosMarkers = [];
@@ -224,23 +226,27 @@ function buscarSED(){
   const nombre = document.getElementById("searchSED").value.trim().toUpperCase();
   const encontrado = sedDatos.find(d => d.sed === nombre);
   if(encontrado){
+    ultimaSED = encontrado;
     document.getElementById('resultadoSED').innerHTML =
       `✅ <b>SED:</b> ${encontrado.sed}<br>
        <b>ALIM:</b> ${encontrado.alim}<br>
        <b>Clientes BT:</b> ${encontrado.clientesBT}<br>
        <b>Tipo:</b> ${encontrado.tipo}<br>
        <b>UT:</b> ${encontrado.ut}`;
+    document.getElementById('verEnGoogleSED').style.display = 'inline';
     actualizarMapa(encontrado.lat, encontrado.lon, encontrado);
  
-// 🔹 Calcular suministros cercanos al SED
+    // 🔹 Calcular suministros cercanos al SED (solo <20m)
     const cercanos = datos
       .map(d => ({...d, dist: getDistance(encontrado.lat, encontrado.lon, d.lat, d.lon)}))
+      .filter(d => d.dist <= 0.02)
       .sort((a,b) => a.dist - b.dist)
       .slice(0,5);
 
     renderCercanosSED(cercanos);
   } else {
     document.getElementById('resultadoSED').textContent = "❌ SED no encontrado";
+    document.getElementById('verEnGoogleSED').style.display = 'none';
     document.getElementById('cercanosSED').innerHTML = '';
   }
 }
@@ -278,7 +284,7 @@ function renderCercanos(lista){
   });
 }
 
-// 🔹 Render cercanos a un SED
+// 🔹 Render cercanos a un SED (solo lista, sin marcador en mapa)
 function renderCercanosSED(lista){
   const ul = document.getElementById("cercanosSED");
   ul.innerHTML = "";
@@ -310,6 +316,14 @@ function actualizarMapa(lat, lon, encontrado){
 function abrirEnGoogleMaps(){
   if(ultimoEncontro){
     const url = `https://www.google.com/maps/search/?api=1&query=${ultimoEncontro.lat},${ultimoEncontro.lon}`;
+    window.open(url, '_blank');
+  }
+}
+
+// 🔹 Abrir SED en Google Maps
+function abrirEnGoogleMapsSED(){
+  if(ultimaSED){
+    const url = `https://www.google.com/maps/search/?api=1&query=${ultimaSED.lat},${ultimaSED.lon}`;
     window.open(url, '_blank');
   }
 }
