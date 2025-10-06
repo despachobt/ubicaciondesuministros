@@ -34,9 +34,7 @@
 <body>
 <div id="loginScreen">
   <div id="loginBox">
-    <!-- 🔹 Logo arriba -->
     <img src="https://dl.dropboxusercontent.com/scl/fi/ymb0if0252ui58cy1voe2/logo-pluz.jpg?rlkey=ghj6tdtn6ccldppjyhj4a2zve&st=rnllbm7y" alt="Logo Pluz">
-    
     <h4 class="mb-3">🔐 Iniciar sesión</h4>
     <div class="mb-2">
       <input type="text" id="user" class="form-control" placeholder="Usuario">
@@ -73,7 +71,6 @@
   <h6>🕑 Historial (últimos 3):</h6>
   <ul id="historial" class="list-group small mb-3"></ul>
 
-  <!-- 🔹 Nueva barra de búsqueda para SED -->
   <h4>📡 Buscar SED</h4>
   <div class="input-group mb-2">
     <input type="text" id="searchSED" class="form-control" placeholder="Nombre de SED">
@@ -89,12 +86,13 @@
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script>
 let datos = [];
-let sedDatos = []; // 🔹 Nuevo array para SED
+let sedDatos = []; 
 let ultimoEncontro = null;
 let ultimaSED = null;
 let map, marker;
 let historial = [];
 let cercanosMarkers = [];
+let sedLayer = L.layerGroup(); 
 let cargados = 0;
 
 const usuarios = [{user:"despachobt", pass:"Pluz2025"}];
@@ -116,7 +114,6 @@ const urls = [
   {nombre: "PANAMERICANA", url: "https://dl.dropboxusercontent.com/scl/fi/qpt0c6dqyhututunxgby5/PANAMERICANA.csv?rlkey=gtkcg709xhcohqdu70v8fzo16"}
 ];
 
-// Progreso
 function actualizarProgreso(){
   cargados++;
   const porcentaje = Math.round((cargados / urls.length) * 100);
@@ -129,12 +126,10 @@ function actualizarProgreso(){
     li.className = "list-group-item text-success";
     li.textContent = "✅ Todos los archivos cargados con éxito.";
     document.getElementById("progreso").appendChild(li);
-
     setTimeout(()=>{ document.getElementById("progresoBox").style.display="none"; }, 2000);
   }
 }
 
-// Cargar CSV de suministros
 urls.forEach(f => {
   fetch(f.url)
     .then(r => r.text())
@@ -165,7 +160,7 @@ urls.forEach(f => {
     });
 });
 
-// 🔹 Cargar CSV de SED
+// 🔹 Cargar CSV de SED y mostrarlos en el mapa
 fetch("https://dl.dropboxusercontent.com/scl/fi/f27szlfjhlid5luse9j7y/SED.csv?rlkey=kmmfa1sawvl73b2wcdn2exrg4")
   .then(r => r.text())
   .then(texto => {
@@ -173,26 +168,30 @@ fetch("https://dl.dropboxusercontent.com/scl/fi/f27szlfjhlid5luse9j7y/SED.csv?rl
     lineas.slice(1).forEach(l => {
       const cols = l.split(",");
       if(cols.length >= 7){
-        sedDatos.push({
-          sed: cols[0].trim().toUpperCase(),   // 👈 limpiamos y pasamos a mayúsculas
+        const obj = {
+          sed: cols[0].trim().toUpperCase(),
           alim: cols[1].trim(),
           clientesBT: cols[2].trim(),
           tipo: cols[3].trim(),
           ut: cols[4].trim(),
           lon: parseFloat(cols[5].replace(",", ".").trim()),
           lat: parseFloat(cols[6].replace(",", ".").trim())
-        });
+        };
+        sedDatos.push(obj);
+        // Agregar al mapa
+        const mark = L.marker([obj.lat, obj.lon], {title: "SED " + obj.sed, icon: L.icon({iconUrl:"https://cdn-icons-png.flaticon.com/512/684/684908.png", iconSize:[22,22]})});
+        mark.bindTooltip(`SED: ${obj.sed}<br>UT: ${obj.ut}`);
+        sedLayer.addLayer(mark);
       }
     });
+    sedLayer.addTo(map);
   });
 
-// Buscar suministro
 function buscarSuministro(){
   if(cargados < urls.length){
     document.getElementById('resultado').textContent = "⚠️ Espera a que termine la carga.";
     return;
   }
-
   const num = document.getElementById('searchBox').value.trim();
   const encontrado = datos.find(d => d.cliente === num);
   if (encontrado){
@@ -200,18 +199,15 @@ function buscarSuministro(){
     document.getElementById('resultado').textContent = '✅ Encontrado en ' + encontrado.ut;
     document.getElementById('verEnGoogle').style.display = 'inline';
     actualizarMapa(encontrado.lat, encontrado.lon, encontrado);
-
     historial.unshift(encontrado);
     if(historial.length > 3) historial.pop();
     renderHistorial();
-
     const cercanos = datos
       .filter(d => d !== encontrado)
       .map(d => ({...d, dist: getDistance(encontrado.lat, encontrado.lon, d.lat, d.lon)}))
       .filter(d => d.dist <= 0.02)
       .sort((a,b) => a.dist - b.dist)
       .slice(0,5);
-
     renderCercanos(cercanos);
   } else {
     document.getElementById('resultado').textContent = '❌ Suministro no encontrado';
@@ -221,7 +217,6 @@ function buscarSuministro(){
   }
 }
 
-// 🔹 Buscar SED
 function buscarSED(){
   const nombre = document.getElementById("searchSED").value.trim().toUpperCase();
   const encontrado = sedDatos.find(d => d.sed === nombre);
@@ -235,14 +230,11 @@ function buscarSED(){
        <b>UT:</b> ${encontrado.ut}`;
     document.getElementById('verEnGoogleSED').style.display = 'inline';
     actualizarMapa(encontrado.lat, encontrado.lon, encontrado);
- 
-    // 🔹 Calcular suministros cercanos al SED (solo <20m)
     const cercanos = datos
       .map(d => ({...d, dist: getDistance(encontrado.lat, encontrado.lon, d.lat, d.lon)}))
       .filter(d => d.dist <= 0.02)
       .sort((a,b) => a.dist - b.dist)
       .slice(0,5);
-
     renderCercanosSED(cercanos);
   } else {
     document.getElementById('resultadoSED').textContent = "❌ SED no encontrado";
@@ -271,20 +263,17 @@ function renderCercanos(lista){
   ul.innerHTML = "";
   cercanosMarkers.forEach(m => map.removeLayer(m));
   cercanosMarkers = [];
-
   lista.forEach(c => {
     const li = document.createElement("li");
     li.className = "list-group-item fade-in";
     li.textContent = "Cliente " + c.cliente + " - " + (c.dist*1000).toFixed(1) + " m";
     ul.appendChild(li);
-
     let mark = L.circleMarker([c.lat, c.lon], {radius:6, color:"gray"}).addTo(map);
     mark.bindTooltip("Cliente: " + c.cliente + "<br>UT: " + c.ut);
     cercanosMarkers.push(mark);
   });
 }
 
-// 🔹 Render cercanos a un SED (solo lista, sin marcador en mapa)
 function renderCercanosSED(lista){
   const ul = document.getElementById("cercanosSED");
   ul.innerHTML = "";
@@ -302,6 +291,7 @@ function actualizarMapa(lat, lon, encontrado){
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: 'Map data © OpenStreetMap contributors'
     }).addTo(map);
+    sedLayer.addTo(map);
   }
   if(marker) map.removeLayer(marker);
   marker = L.marker([lat, lon], {title:(encontrado.cliente ? "Cliente " + encontrado.cliente : "SED " + encontrado.sed)}).addTo(map);
@@ -319,8 +309,6 @@ function abrirEnGoogleMaps(){
     window.open(url, '_blank');
   }
 }
-
-// 🔹 Abrir SED en Google Maps
 function abrirEnGoogleMapsSED(){
   if(ultimaSED){
     const url = `https://www.google.com/maps/search/?api=1&query=${ultimaSED.lat},${ultimaSED.lon}`;
@@ -344,3 +332,4 @@ function toggleSidebar(){
 </script>
 </body>
 </html>
+
