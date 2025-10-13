@@ -6,17 +6,19 @@
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
 <style>
+.sed-square-icon {
+  background-color: #007BFF;
+  border: 2px solid white;
+  border-radius: 2px; /* esquinas ligeramente redondeadas */
+  box-shadow: 0 0 2px rgba(0,0,0,0.5);
+}
   body { margin: 0; height: 100vh; display: flex; overflow: hidden; }
-  #sidebar {
-    width: 320px; background: #f8f9fa; padding: 15px; overflow-y: auto; transition: all 0.3s ease;
-  }
+  #sidebar { width: 320px; background: #f8f9fa; padding: 15px; overflow-y: auto; transition: all 0.3s ease; }
   #sidebar.hidden { transform: translateX(-100%); }
   #map { flex: 1; }
   .fade-in { animation: fadeIn 0.5s ease-in-out; }
   @keyframes fadeIn { from {opacity:0;} to {opacity:1;} }
-  .toggle-btn {
-    position: absolute; top: 10px; left: 10px; z-index: 1000;
-  }
+  .toggle-btn { position: absolute; top: 10px; left: 10px; z-index: 1000; }
   #loginScreen {
     position: fixed; top:0; left:0; width:100%; height:100%; 
     background: rgba(0,0,0,0.7); display:flex; justify-content:center; align-items:center;
@@ -25,10 +27,7 @@
   #loginBox {
     background:white; padding:20px; border-radius:8px; width:300px; text-align:center;
   }
-  #loginBox img {
-    width: 120px;
-    margin-bottom: 15px;
-  }
+  #loginBox img { width: 120px; margin-bottom: 15px; }
 </style>
 </head>
 <body>
@@ -36,18 +35,15 @@
   <div id="loginBox">
     <img src="https://dl.dropboxusercontent.com/scl/fi/ymb0if0252ui58cy1voe2/logo-pluz.jpg?rlkey=ghj6tdtn6ccldppjyhj4a2zve&st=rnllbm7y" alt="Logo Pluz">
     <h4 class="mb-3">🔐 Iniciar sesión</h4>
-    <div class="mb-2">
-      <input type="text" id="user" class="form-control" placeholder="Usuario">
-    </div>
-    <div class="mb-2">
-      <input type="password" id="pass" class="form-control" placeholder="Contraseña">
-    </div>
+    <div class="mb-2"><input type="text" id="user" class="form-control" placeholder="Usuario"></div>
+    <div class="mb-2"><input type="password" id="pass" class="form-control" placeholder="Contraseña"></div>
     <button class="btn btn-primary w-100" onclick="login()">Ingresar</button>
     <div id="loginMsg" class="text-danger mt-2"></div>
   </div>
 </div>
 
 <button class="btn btn-primary toggle-btn" onclick="toggleSidebar()">☰</button>
+
 <div id="sidebar">
   <h4>🔎 Buscar suministro</h4>
   <div class="input-group mb-2">
@@ -80,34 +76,67 @@
   <button id="verEnGoogleSED" class="btn btn-outline-warning btn-sm mb-3" style="display:none" onclick="abrirEnGoogleMapsSED()">Ver en Google Maps</button>
   <h6>🔎 Suministros cercanos al SED (&lt;20m):</h6>
   <ul id="cercanosSED" class="list-group small mb-3"></ul>
+<!-- 🔹 NUEVA OPCIÓN: activar SEDs manualmente -->
+  <div class="form-check mt-3">
+    <input class="form-check-input" type="checkbox" id="toggleSEDs" onchange="toggleSEDLayer(this.checked)">
+    <label class="form-check-label" for="toggleSEDs">Mostrar SEDs en el mapa</label>
+  </div>
+  <h4>📍 Buscar por coordenadas</h4>
+  <div class="input-group mb-2">
+    <input type="text" id="coordInput" class="form-control" placeholder="Ej: -11.872993250593792, -77.11465626408449">
+    <button class="btn btn-info" onclick="buscarPorCoordenadas()">Buscar</button>
+  </div>
+  <div id="resultadoCoord" class="text-primary small mb-2"></div>
+  <h6>🔎 Suministros cercanos (&lt;20m):</h6>
+  <ul id="cercanosCoord" class="list-group small mb-3"></ul>
 </div>
-<div id="map"></div>
 
+<div id="map"></div>
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script>
-let datos = [];
-let sedDatos = []; 
-let ultimoEncontro = null;
-let ultimaSED = null;
-let map, marker;
-let historial = [];
-let cercanosMarkers = [];
+let datos = [], sedDatos = [], historial = [], cercanosMarkers = [];
+let ultimoEncontro = null, ultimaSED = null, map, marker;
 let sedLayer = L.layerGroup(); 
-let cargados = 0;
+let cargados = 0, datosListos = false;
 
-const usuarios = [{user:"despachobt", pass:"Pluz2025"}];
+// 🔹 Inicializa el mapa vacío (sin SEDs activadas)
+map = L.map('map').setView([-11.95, -76.95], 8);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: 'Map data © OpenStreetMap contributors'
+}).addTo(map);
 
-function login(){
-  const u = document.getElementById("user").value.trim();
-  const p = document.getElementById("pass").value.trim();
-  const ok = usuarios.find(x=>x.user===u && x.pass===p);
-  if(ok){
-    document.getElementById("loginScreen").style.display="none";
+// 🔹 NUEVO: mostrar/ocultar capa SED
+function toggleSEDLayer(checked) {
+  if (checked) {
+    if (!sedLayer.getLayers().length) {
+      cargarSEDs();
+    } else {
+      sedLayer.addTo(map);
+    }
   } else {
-    document.getElementById("loginMsg").textContent="❌ Usuario o contraseña incorrectos";
+    map.removeLayer(sedLayer);
   }
 }
 
+// ✅ LOGIN CORREGIDO
+const usuarios = [{ user: "despachobt", pass: "Pluz2025" }];
+function login() {
+  const u = document.getElementById("user").value.trim();
+  const p = document.getElementById("pass").value.trim();
+  const msg = document.getElementById("loginMsg");
+
+  const ok = usuarios.find(x => x.user === u && x.pass === p);
+  if (ok) {
+    msg.textContent = "";
+    document.getElementById("loginScreen").style.display = "none";
+  } else {
+    msg.textContent = "❌ Usuario o contraseña incorrectos";
+  }
+}
+
+// --------------------------------------------------
+// 🔹 CARGA DE ARCHIVOS DE SUMINISTROS
+// --------------------------------------------------
 const urls = [
   {nombre: "NORTE CHICO", url: "https://dl.dropboxusercontent.com/scl/fi/gq78aaeeowpllmk6aq6u8/NORTE-CHICO.csv?rlkey=amoh5m764nbkoobv8tggbbmhb"},
   {nombre: "COLONIAL", url: "https://dl.dropboxusercontent.com/scl/fi/mo1wrl48ky5v74l3ybfpd/COLONIAL.csv?rlkey=jhcfg302k4re8lnp5aya8o02n"},
@@ -116,17 +145,18 @@ const urls = [
 
 function actualizarProgreso(){
   cargados++;
-  const porcentaje = Math.round((cargados / urls.length) * 100);
   const bar = document.getElementById("progress-bar");
+  const porcentaje = Math.round((cargados / urls.length) * 100);
   bar.style.width = porcentaje + "%";
   bar.textContent = porcentaje + "%";
   if(cargados === urls.length){
+    datosListos = true;
     bar.classList.remove("progress-bar-animated");
-    let li = document.createElement("li");
+    const li = document.createElement("li");
     li.className = "list-group-item text-success";
     li.textContent = "✅ Todos los archivos cargados con éxito.";
-    document.getElementById("progreso").appendChild(li);
-    setTimeout(()=>{ document.getElementById("progresoBox").style.display="none"; }, 2000);
+    progreso.appendChild(li);
+    setTimeout(()=>{ progresoBox.style.display="none"; }, 2000);
   }
 }
 
@@ -147,189 +177,217 @@ urls.forEach(f => {
         }
       });
       actualizarProgreso();
-      let li = document.createElement("li");
+      const li = document.createElement("li");
       li.className = "list-group-item";
-      li.textContent = f.nombre + ": " + lineas.length + " filas cargadas";
-      document.getElementById("progreso").appendChild(li);
+      li.textContent = `${f.nombre}: ${lineas.length} filas cargadas`;
+      progreso.appendChild(li);
     })
-    .catch(err => {
-      let li = document.createElement("li");
+    .catch(() => {
+      const li = document.createElement("li");
       li.className = "list-group-item text-danger";
       li.textContent = "❌ Error al cargar " + f.nombre;
-      document.getElementById("progreso").appendChild(li);
+      progreso.appendChild(li);
     });
 });
 
-// 🔹 Cargar CSV de SED y mostrarlos en el mapa
-fetch("https://dl.dropboxusercontent.com/scl/fi/f27szlfjhlid5luse9j7y/SED.csv?rlkey=kmmfa1sawvl73b2wcdn2exrg4")
-  .then(r => r.text())
-  .then(texto => {
-    const lineas = texto.trim().split(/\r?\n/);
-    lineas.slice(1).forEach(l => {
-      const cols = l.split(",");
-      if(cols.length >= 7){
-        const obj = {
-          sed: cols[0].trim().toUpperCase(),
-          alim: cols[1].trim(),
-          clientesBT: cols[2].trim(),
-          tipo: cols[3].trim(),
-          ut: cols[4].trim(),
-          lon: parseFloat(cols[5].replace(",", ".").trim()),
-          lat: parseFloat(cols[6].replace(",", ".").trim())
-        };
-        sedDatos.push(obj);
-        // Agregar al mapa
-        const mark = L.marker([obj.lat, obj.lon], {title: "SED " + obj.sed, icon: L.icon({iconUrl:"https://cdn-icons-png.flaticon.com/512/684/684908.png", iconSize:[22,22]})});
-        mark.bindTooltip(`SED: ${obj.sed}<br>UT: ${obj.ut}`);
-        sedLayer.addLayer(mark);
-      }
-    });
-    sedLayer.addTo(map);
-  });
+// 🔹 NUEVO: función para cargar las SEDs solo si se activa la casilla
+function cargarSEDs() {
+  fetch("https://dl.dropboxusercontent.com/scl/fi/f27szlfjhlid5luse9j7y/SED.csv?rlkey=kmmfa1sawvl73b2wcdn2exrg4")
+    .then(r => r.text())
+    .then(texto => {
+      const lineas = texto.trim().split(/\r?\n/);
+      lineas.slice(1).forEach(l => {
+        const cols = l.split(",");
+        if(cols.length >= 7){
+          const obj = {
+            sed: cols[0].trim().toUpperCase(),
+            alim: cols[1].trim(),
+            clientesBT: cols[2].trim(),
+            tipo: cols[3].trim(),
+            ut: cols[4].trim(),
+            lon: parseFloat(cols[5].replace(",", ".").trim()),
+            lat: parseFloat(cols[6].replace(",", ".").trim())
+          };
+          sedDatos.push(obj);
+// 🔹 Marcador cuadrado personalizado para SED
+const squareIcon = L.divIcon({
+  className: 'sed-square-icon',
+  iconSize: [18, 18] // tamaño del cuadrado
+});
 
+// Crear marcador con ícono cuadrado
+const markerSED = L.marker([obj.lat, obj.lon], { icon: squareIcon });
+
+// Tooltip con información adicional
+markerSED.bindTooltip(
+  `SED: ${obj.sed}<br>ALIM: ${obj.alim}<br>UT: ${obj.ut}`,
+  { direction: "top" }
+);
+
+sedLayer.addLayer(markerSED);
+        }
+      });
+      sedLayer.addTo(map);
+    });
+}
+
+// --------------------------------------------------
+// 🔹 FUNCIONES DE BÚSQUEDA (sin cambios)
+// --------------------------------------------------
 function buscarSuministro(){
-  if(cargados < urls.length){
-    document.getElementById('resultado').textContent = "⚠️ Espera a que termine la carga.";
-    return;
-  }
-  const num = document.getElementById('searchBox').value.trim();
+  if(!datosListos){ resultado.textContent="⚠️ Espera a que termine la carga."; return; }
+  const num = searchBox.value.trim();
   const encontrado = datos.find(d => d.cliente === num);
-  if (encontrado){
+  if(encontrado){
     ultimoEncontro = encontrado;
-    document.getElementById('resultado').textContent = '✅ Encontrado en ' + encontrado.ut;
-    document.getElementById('verEnGoogle').style.display = 'inline';
+    resultado.textContent = "✅ Encontrado en " + encontrado.ut;
+    verEnGoogle.style.display = "inline";
     actualizarMapa(encontrado.lat, encontrado.lon, encontrado);
     historial.unshift(encontrado);
     if(historial.length > 3) historial.pop();
     renderHistorial();
-    const cercanos = datos
-      .filter(d => d !== encontrado)
-      .map(d => ({...d, dist: getDistance(encontrado.lat, encontrado.lon, d.lat, d.lon)}))
-      .filter(d => d.dist <= 0.02)
-      .sort((a,b) => a.dist - b.dist)
-      .slice(0,5);
+    const cercanos = datos.filter(d => d!==encontrado)
+      .map(d=>({...d, dist:getDistance(encontrado.lat,encontrado.lon,d.lat,d.lon)}))
+      .filter(d=>d.dist<=0.02).sort((a,b)=>a.dist-b.dist).slice(0,5);
     renderCercanos(cercanos);
   } else {
-    document.getElementById('resultado').textContent = '❌ Suministro no encontrado';
-    document.getElementById('verEnGoogle').style.display = 'none';
-    document.getElementById('cercanos').innerHTML = '';
-    document.getElementById('historial').innerHTML = '';
+    resultado.textContent="❌ Suministro no encontrado";
+    verEnGoogle.style.display="none";
+    cercanos.innerHTML = historial.innerHTML = "";
   }
 }
 
 function buscarSED(){
-  const nombre = document.getElementById("searchSED").value.trim().toUpperCase();
+  const nombre = searchSED.value.trim().toUpperCase();
   const encontrado = sedDatos.find(d => d.sed === nombre);
   if(encontrado){
     ultimaSED = encontrado;
-    document.getElementById('resultadoSED').innerHTML =
-      `✅ <b>SED:</b> ${encontrado.sed}<br>
-       <b>ALIM:</b> ${encontrado.alim}<br>
-       <b>Clientes BT:</b> ${encontrado.clientesBT}<br>
-       <b>Tipo:</b> ${encontrado.tipo}<br>
-       <b>UT:</b> ${encontrado.ut}`;
-    document.getElementById('verEnGoogleSED').style.display = 'inline';
+    resultadoSED.innerHTML = `✅ <b>SED:</b> ${encontrado.sed}<br><b>ALIM:</b> ${encontrado.alim}<br><b>Clientes BT:</b> ${encontrado.clientesBT}<br><b>Tipo:</b> ${encontrado.tipo}<br><b>UT:</b> ${encontrado.ut}`;
+    verEnGoogleSED.style.display = "inline";
     actualizarMapa(encontrado.lat, encontrado.lon, encontrado);
-    const cercanos = datos
-      .map(d => ({...d, dist: getDistance(encontrado.lat, encontrado.lon, d.lat, d.lon)}))
-      .filter(d => d.dist <= 0.02)
-      .sort((a,b) => a.dist - b.dist)
-      .slice(0,5);
+    const cercanos = datos.map(d=>({...d, dist:getDistance(encontrado.lat,encontrado.lon,d.lat,d.lon)}))
+      .filter(d=>d.dist<=0.02).sort((a,b)=>a.dist-b.dist).slice(0,5);
     renderCercanosSED(cercanos);
   } else {
-    document.getElementById('resultadoSED').textContent = "❌ SED no encontrado";
-    document.getElementById('verEnGoogleSED').style.display = 'none';
-    document.getElementById('cercanosSED').innerHTML = '';
+    resultadoSED.textContent="❌ SED no encontrado";
+    verEnGoogleSED.style.display="none";
+    cercanosSED.innerHTML="";
   }
 }
 
+function buscarPorCoordenadas(){
+  if(!datosListos){ resultadoCoord.textContent="⚠️ Espera a que se carguen los datos."; return; }
+  const input = coordInput.value.trim();
+  if(!input){ resultadoCoord.textContent="⚠️ Ingresa coordenadas."; return; }
+  const partes = input.split(",");
+  if(partes.length<2){ resultadoCoord.textContent="⚠️ Formato inválido. Usa: lat, lon"; return; }
+  const lat=parseFloat(partes[0]), lon=parseFloat(partes[1]);
+  if(isNaN(lat)||isNaN(lon)){ resultadoCoord.textContent="⚠️ Coordenadas inválidas."; return; }
+  const cercanos = datos.map(d=>({...d,dist:getDistance(lat,lon,d.lat,d.lon)}))
+    .filter(d=>d.dist<=0.02).sort((a,b)=>a.dist-b.dist).slice(0,10);
+  resultadoCoord.innerHTML=`📍 Ubicación: <b>${lat.toFixed(6)}, ${lon.toFixed(6)}</b><br>`+
+    (cercanos.length?`✅ ${cercanos.length} suministros encontrados.`:"❌ Ninguno dentro de 20 m.");
+  renderCercanosCoord(cercanos);
+  actualizarMapa(lat, lon, {ut:"COORDENADA PEGADA"});
+}
+
+// --------------------------------------------------
+// 🔹 FUNCIONES DE INTERFAZ Y UTILIDADES
+// --------------------------------------------------
 function renderHistorial(){
   const ul = document.getElementById("historial");
-  ul.innerHTML = "";
-  historial.forEach(h => {
-    const li = document.createElement("li");
-    li.className = "list-group-item list-group-item-action";
-    li.textContent = h.cliente + " ("+h.ut+")";
-    li.onclick = () => {
-      document.getElementById('searchBox').value = h.cliente;
-      buscarSuministro();
-    };
+  ul.innerHTML="";
+  historial.forEach(h=>{
+    const li=document.createElement("li");
+    li.className="list-group-item list-group-item-action";
+    li.textContent=h.cliente+" ("+h.ut+")";
+    li.onclick=()=>{searchBox.value=h.cliente; buscarSuministro();};
     ul.appendChild(li);
   });
 }
 
-function renderCercanos(lista){
-  const ul = document.getElementById("cercanos");
-  ul.innerHTML = "";
-  cercanosMarkers.forEach(m => map.removeLayer(m));
-  cercanosMarkers = [];
-  lista.forEach(c => {
-    const li = document.createElement("li");
-    li.className = "list-group-item fade-in";
-    li.textContent = "Cliente " + c.cliente + " - " + (c.dist*1000).toFixed(1) + " m";
+function renderCercanos(lista){ 
+  const ul=cercanos; ul.innerHTML=""; 
+  cercanosMarkers.forEach(m=>map.removeLayer(m)); 
+  cercanosMarkers=[];
+  lista.forEach(c=>{
+    const li=document.createElement("li");
+    li.className="list-group-item fade-in";
+    li.textContent="Cliente "+c.cliente+" - "+(c.dist*1000).toFixed(1)+" m"; 
     ul.appendChild(li);
-    let mark = L.circleMarker([c.lat, c.lon], {radius:6, color:"gray"}).addTo(map);
-    mark.bindTooltip("Cliente: " + c.cliente + "<br>UT: " + c.ut);
+    let mark=L.circleMarker([c.lat,c.lon],{radius:6,color:"gray"}).addTo(map);
+    mark.bindTooltip("Cliente: "+c.cliente+"<br>UT: "+c.ut);
     cercanosMarkers.push(mark);
   });
 }
 
-function renderCercanosSED(lista){
-  const ul = document.getElementById("cercanosSED");
-  ul.innerHTML = "";
+function renderCercanosSED(lista){ 
+  const ul = cercanosSED; 
+  ul.innerHTML = ""; 
+
+  // Limpiar marcadores anteriores
+  cercanosMarkers.forEach(m => map.removeLayer(m)); 
+  cercanosMarkers = [];
+
   lista.forEach(c => {
     const li = document.createElement("li");
-    li.className = "list-group-item fade-in";
-    li.textContent = `Cliente ${c.cliente} - ${(c.dist*1000).toFixed(1)} m`;
+    li.className = "list-group-item fade-in"; 
+    li.textContent = `Cliente ${c.cliente} - ${(c.dist * 1000).toFixed(1)} m`; 
     ul.appendChild(li);
+
+    // 🔹 Agregar marcador en el mapa
+    const mark = L.circleMarker([c.lat, c.lon], { 
+      radius: 6, 
+      color: "orange", 
+      fillColor: "yellow", 
+      fillOpacity: 0.8 
+    }).addTo(map);
+
+    mark.bindTooltip(`Cliente: ${c.cliente}<br>UT: ${c.ut}<br>Dist: ${(c.dist*1000).toFixed(1)} m`);
+    cercanosMarkers.push(mark);
   });
 }
 
-function actualizarMapa(lat, lon, encontrado){
-  if (!map){
-    map = L.map('map').setView([lat, lon], 15);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: 'Map data © OpenStreetMap contributors'
+function renderCercanosCoord(lista){ 
+  const ul = cercanosCoord; 
+  ul.innerHTML = ""; 
+
+  // Limpiar marcadores anteriores
+  cercanosMarkers.forEach(m => map.removeLayer(m)); 
+  cercanosMarkers = [];
+
+  lista.forEach(c => {
+    const li = document.createElement("li");
+    li.className = "list-group-item fade-in"; 
+    li.textContent = `Cliente ${c.cliente} - ${(c.dist * 1000).toFixed(1)} m`; 
+    ul.appendChild(li);
+
+    // 🔹 Agregar marcador en el mapa
+    const mark = L.circleMarker([c.lat, c.lon], { 
+      radius: 6, 
+      color: "green", 
+      fillColor: "#6f6", 
+      fillOpacity: 0.8 
     }).addTo(map);
-    sedLayer.addTo(map);
-  }
+
+    mark.bindTooltip(`Cliente: ${c.cliente}<br>UT: ${c.ut}<br>Dist: ${(c.dist*1000).toFixed(1)} m`);
+    cercanosMarkers.push(mark);
+  });
+}
+
+function actualizarMapa(lat,lon,encontrado){
   if(marker) map.removeLayer(marker);
-  marker = L.marker([lat, lon], {title:(encontrado.cliente ? "Cliente " + encontrado.cliente : "SED " + encontrado.sed)}).addTo(map);
-  if(encontrado.cliente){
-    marker.bindTooltip("Cliente: " + encontrado.cliente + "<br>UT: " + encontrado.ut).openTooltip();
-  } else {
-    marker.bindTooltip("SED: " + encontrado.sed + "<br>UT: " + encontrado.ut).openTooltip();
-  }
-  map.setView([lat, lon], 17, {animate:true});
+  marker=L.marker([lat,lon],{title:(encontrado.cliente?"Cliente "+encontrado.cliente:"SED "+(encontrado.sed||""))}).addTo(map);
+  marker.bindTooltip((encontrado.cliente?"Cliente: "+encontrado.cliente:"SED: "+(encontrado.sed||""))+"<br>UT: "+(encontrado.ut||"")).openTooltip();
+  map.setView([lat,lon],17,{animate:true});
 }
 
-function abrirEnGoogleMaps(){
-  if(ultimoEncontro){
-    const url = `https://www.google.com/maps/search/?api=1&query=${ultimoEncontro.lat},${ultimoEncontro.lon}`;
-    window.open(url, '_blank');
-  }
-}
-function abrirEnGoogleMapsSED(){
-  if(ultimaSED){
-    const url = `https://www.google.com/maps/search/?api=1&query=${ultimaSED.lat},${ultimaSED.lon}`;
-    window.open(url, '_blank');
-  }
-}
-
-function getDistance(lat1, lon1, lat2, lon2){
-  const R = 6371;
-  const dLat = (lat2-lat1)*Math.PI/180;
-  const dLon = (lon2-lon1)*Math.PI/180;
-  const a = Math.sin(dLat/2)*Math.sin(dLat/2)+
-    Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)* 
-    Math.sin(dLon/2)*Math.sin(dLon/2);
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-}
-
-function toggleSidebar(){
-  document.getElementById("sidebar").classList.toggle("hidden");
-}
+function abrirEnGoogleMaps(){ if(ultimoEncontro){ window.open(`https://www.google.com/maps/search/?api=1&query=${ultimoEncontro.lat},${ultimoEncontro.lon}`,'_blank'); }}
+function abrirEnGoogleMapsSED(){ if(ultimaSED){ window.open(`https://www.google.com/maps/search/?api=1&query=${ultimaSED.lat},${ultimaSED.lon}`,'_blank'); }}
+function getDistance(lat1,lon1,lat2,lon2){ const R=6371,dLat=(lat2-lat1)*Math.PI/180,dLon=(lon2-lon1)*Math.PI/180;
+  const a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));}
+function toggleSidebar(){ sidebar.classList.toggle("hidden"); }
 </script>
 </body>
 </html>
-
