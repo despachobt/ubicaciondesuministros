@@ -6,12 +6,9 @@
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
 <style>
-.sed-square-icon {
-  background-color: #007BFF;
-  border: 2px solid white;
-  border-radius: 2px; /* esquinas ligeramente redondeadas */
-  box-shadow: 0 0 2px rgba(0,0,0,0.5);
-}
+	#panelAtenciones.hidden {
+  	display: none !important;
+	}
   body { margin: 0; height: 100vh; display: flex; overflow: hidden; }
   #sidebar { width: 320px; background: #f8f9fa; padding: 15px; overflow-y: auto; transition: all 0.3s ease; }
   #sidebar.hidden { transform: translateX(-100%); }
@@ -28,6 +25,29 @@
     background:white; padding:20px; border-radius:8px; width:300px; text-align:center;
   }
   #loginBox img { width: 120px; margin-bottom: 15px; }
+
+  /* Panel derecho de atenciones */
+  #panelAtenciones {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 350px;
+  height: 100%;
+  background: #ffffff;
+  border-left: 2px solid #ddd;
+  overflow-y: auto;
+  padding: 15px;
+  z-index: 1500;
+
+  /* animación */
+  transform: translateX(100%);
+  transition: transform 0.4s ease-in-out;
+}
+
+/* Cuando está visible */
+#panelAtenciones.visible {
+  transform: translateX(0);
+}
 </style>
 </head>
 <body>
@@ -74,16 +94,18 @@
   </div>
   <div id="resultadoSED" class="text-primary mb-2"></div>
   <button id="verEnGoogleSED" class="btn btn-outline-warning btn-sm mb-3" style="display:none" onclick="abrirEnGoogleMapsSED()">Ver en Google Maps</button>
+
+  <div class="form-check form-switch mb-3">
+    <input class="form-check-input" type="checkbox" id="toggleSEDs" onchange="toggleSEDs(this.checked)">
+    <label class="form-check-label" for="toggleSEDs">Mostrar SEDs</label>
+  </div>
+
   <h6>🔎 Suministros cercanos al SED (&lt;20m):</h6>
   <ul id="cercanosSED" class="list-group small mb-3"></ul>
-<!-- 🔹 NUEVA OPCIÓN: activar SEDs manualmente -->
-  <div class="form-check mt-3">
-    <input class="form-check-input" type="checkbox" id="toggleSEDs" onchange="toggleSEDLayer(this.checked)">
-    <label class="form-check-label" for="toggleSEDs">Mostrar SEDs en el mapa</label>
-  </div>
+
   <h4>📍 Buscar por coordenadas</h4>
   <div class="input-group mb-2">
-    <input type="text" id="coordInput" class="form-control" placeholder="Ej: -11.872993250593792, -77.11465626408449">
+    <input type="text" id="coordInput" class="form-control" placeholder="Ej: -11.872993, -77.114656">
     <button class="btn btn-info" onclick="buscarPorCoordenadas()">Buscar</button>
   </div>
   <div id="resultadoCoord" class="text-primary small mb-2"></div>
@@ -91,303 +113,378 @@
   <ul id="cercanosCoord" class="list-group small mb-3"></ul>
 </div>
 
+<!-- Panel lateral derecho -->
+<div id="panelAtenciones">
+  <h5>📋 Atenciones del suministro</h5>
+  <ul id="listaAtenciones" class="list-group"></ul>
+</div>
+
+<button class="btn btn-secondary" id="toggleAtencionesBtn" 
+        style="position:absolute; bottom:20px; right:20px; z-index:1600;">
+  📋 Atenciones
+</button>
 <div id="map"></div>
+
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script>
-let datos = [], sedDatos = [], historial = [], cercanosMarkers = [];
+let datos = [], sedDatos = [], historial = [], cercanosMarkers = [], atenciones = [];
 let ultimoEncontro = null, ultimaSED = null, map, marker;
-let sedLayer = L.layerGroup(); 
+let sedLayer = L.layerGroup();
 let cargados = 0, datosListos = false;
 
-// 🔹 Inicializa el mapa vacío (sin SEDs activadas)
+// Inicializa mapa
 map = L.map('map').setView([-11.95, -76.95], 8);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: 'Map data © OpenStreetMap contributors'
 }).addTo(map);
 
-// 🔹 NUEVO: mostrar/ocultar capa SED
-function toggleSEDLayer(checked) {
-  if (checked) {
-    if (!sedLayer.getLayers().length) {
-      cargarSEDs();
-    } else {
-      sedLayer.addTo(map);
-    }
-  } else {
-    map.removeLayer(sedLayer);
-  }
+const usuarios = [{user:"despachobt", pass:"Pluz2025"}];
+function login(){
+  const u=user.value.trim(), p=pass.value.trim();
+  const ok=usuarios.find(x=>x.user===u&&x.pass===p);
+  loginMsg.textContent = ok ? "" : "❌ Usuario o contraseña incorrectos";
+  if(ok) loginScreen.style.display="none";
 }
 
-// ✅ LOGIN CORREGIDO
-const usuarios = [{ user: "despachobt", pass: "Pluz2025" }];
-function login() {
-  const u = document.getElementById("user").value.trim();
-  const p = document.getElementById("pass").value.trim();
-  const msg = document.getElementById("loginMsg");
-
-  const ok = usuarios.find(x => x.user === u && x.pass === p);
-  if (ok) {
-    msg.textContent = "";
-    document.getElementById("loginScreen").style.display = "none";
-  } else {
-    msg.textContent = "❌ Usuario o contraseña incorrectos";
-  }
-}
-
-// --------------------------------------------------
-// 🔹 CARGA DE ARCHIVOS DE SUMINISTROS
-// --------------------------------------------------
 const urls = [
-  {nombre: "NORTE CHICO", url: "https://dl.dropboxusercontent.com/scl/fi/gq78aaeeowpllmk6aq6u8/NORTE-CHICO.csv?rlkey=amoh5m764nbkoobv8tggbbmhb"},
-  {nombre: "COLONIAL", url: "https://dl.dropboxusercontent.com/scl/fi/mo1wrl48ky5v74l3ybfpd/COLONIAL.csv?rlkey=jhcfg302k4re8lnp5aya8o02n"},
-  {nombre: "PANAMERICANA", url: "https://dl.dropboxusercontent.com/scl/fi/qpt0c6dqyhututunxgby5/PANAMERICANA.csv?rlkey=gtkcg709xhcohqdu70v8fzo16"}
+  {nombre:"NORTE CHICO",url:"https://dl.dropboxusercontent.com/scl/fi/gq78aaeeowpllmk6aq6u8/NORTE-CHICO.csv?rlkey=amoh5m764nbkoobv8tggbbmhb"},
+  {nombre:"COLONIAL",url:"https://dl.dropboxusercontent.com/scl/fi/mo1wrl48ky5v74l3ybfpd/COLONIAL.csv?rlkey=jhcfg302k4re8lnp5aya8o02n"},
+  {nombre:"PANAMERICANA",url:"https://dl.dropboxusercontent.com/scl/fi/qpt0c6dqyhututunxgby5/PANAMERICANA.csv?rlkey=gtkcg709xhcohqdu70v8fzo16"}
 ];
 
 function actualizarProgreso(){
   cargados++;
-  const bar = document.getElementById("progress-bar");
-  const porcentaje = Math.round((cargados / urls.length) * 100);
-  bar.style.width = porcentaje + "%";
-  bar.textContent = porcentaje + "%";
-  if(cargados === urls.length){
-    datosListos = true;
+  const bar=document.getElementById("progress-bar");
+  const porcentaje=Math.round((cargados/urls.length)*100);
+  bar.style.width=porcentaje+"%";
+  bar.textContent=porcentaje+"%";
+  if(cargados===urls.length){
+    datosListos=true;
     bar.classList.remove("progress-bar-animated");
-    const li = document.createElement("li");
-    li.className = "list-group-item text-success";
-    li.textContent = "✅ Todos los archivos cargados con éxito.";
+    const li=document.createElement("li");
+    li.className="list-group-item text-success";
+    li.textContent="✅ Todos los archivos cargados con éxito.";
     progreso.appendChild(li);
-    setTimeout(()=>{ progresoBox.style.display="none"; }, 2000);
+    setTimeout(()=>{progresoBox.style.display="none";},2000);
   }
 }
 
-urls.forEach(f => {
-  fetch(f.url)
-    .then(r => r.text())
-    .then(texto => {
-      const lineas = texto.split("\n");
-      lineas.slice(1).forEach(l => {
-        const cols = l.trim().split(";");
-        if(cols.length >= 4){
-          datos.push({
-            cliente: cols[0].trim(),
-            ut: cols[1].trim(),
-            lat: parseFloat(cols[2].replace(",", ".")),
-            lon: parseFloat(cols[3].replace(",", "."))
-          });
-        }
-      });
-      actualizarProgreso();
-      const li = document.createElement("li");
-      li.className = "list-group-item";
-      li.textContent = `${f.nombre}: ${lineas.length} filas cargadas`;
-      progreso.appendChild(li);
-    })
-    .catch(() => {
-      const li = document.createElement("li");
-      li.className = "list-group-item text-danger";
-      li.textContent = "❌ Error al cargar " + f.nombre;
-      progreso.appendChild(li);
+// Cargar suministros
+urls.forEach(f=>{
+  fetch(f.url).then(r=>r.text()).then(texto=>{
+    const lineas=texto.split("\n");
+    lineas.slice(1).forEach(l=>{
+      const cols=l.trim().split(";");
+      if(cols.length>=4){
+        datos.push({
+          cliente:cols[0].trim(),
+          ut:cols[1].trim(),
+          lat:parseFloat(cols[2].replace(",", ".")),
+          lon:parseFloat(cols[3].replace(",", "."))
+        });
+      }
     });
+    actualizarProgreso();
+    const li=document.createElement("li");
+    li.className="list-group-item";
+    li.textContent=`${f.nombre}: ${lineas.length} filas cargadas`;
+    progreso.appendChild(li);
+  }).catch(()=>{
+    const li=document.createElement("li");
+    li.className="list-group-item text-danger";
+    li.textContent="❌ Error al cargar "+f.nombre;
+    progreso.appendChild(li);
+  });
 });
 
-// 🔹 NUEVO: función para cargar las SEDs solo si se activa la casilla
-function cargarSEDs() {
-  fetch("https://dl.dropboxusercontent.com/scl/fi/f27szlfjhlid5luse9j7y/SED.csv?rlkey=kmmfa1sawvl73b2wcdn2exrg4")
-    .then(r => r.text())
-    .then(texto => {
-      const lineas = texto.trim().split(/\r?\n/);
-      lineas.slice(1).forEach(l => {
-        const cols = l.split(",");
-        if(cols.length >= 7){
-          const obj = {
-            sed: cols[0].trim().toUpperCase(),
-            alim: cols[1].trim(),
-            clientesBT: cols[2].trim(),
-            tipo: cols[3].trim(),
-            ut: cols[4].trim(),
-            lon: parseFloat(cols[5].replace(",", ".").trim()),
-            lat: parseFloat(cols[6].replace(",", ".").trim())
-          };
-          sedDatos.push(obj);
-// 🔹 Marcador cuadrado personalizado para SED
-const squareIcon = L.divIcon({
-  className: 'sed-square-icon',
-  iconSize: [18, 18] // tamaño del cuadrado
-});
-
-// Crear marcador con ícono cuadrado
-const markerSED = L.marker([obj.lat, obj.lon], { icon: squareIcon });
-
-// Tooltip con información adicional
-markerSED.bindTooltip(
-  `SED: ${obj.sed}<br>ALIM: ${obj.alim}<br>UT: ${obj.ut}`,
-  { direction: "top" }
-);
-
-sedLayer.addLayer(markerSED);
-        }
-      });
-      sedLayer.addTo(map);
+// Cargar SEDs (inicialmente ocultas)
+fetch("https://dl.dropboxusercontent.com/scl/fi/f27szlfjhlid5luse9j7y/SED.csv?rlkey=kmmfa1sawvl73b2wcdn2exrg4")
+  .then(r=>r.text())
+  .then(texto=>{
+    const lineas=texto.trim().split(/\r?\n/);
+    lineas.slice(1).forEach(l=>{
+      const cols=l.split(",");
+      if(cols.length>=7){
+        const obj={
+          sed:cols[0].trim().toUpperCase(),
+          alim:cols[1].trim(),
+          clientesBT:cols[2].trim(),
+          tipo:cols[3].trim(),
+          ut:cols[4].trim(),
+          lon:parseFloat(cols[5].replace(",", ".").trim()),
+          lat:parseFloat(cols[6].replace(",", ".").trim())
+        };
+        sedDatos.push(obj);
+        const mark=L.rectangle([[obj.lat-0.00005,obj.lon-0.00005],[obj.lat+0.00005,obj.lon+0.00005]],{
+          color:"blue",weight:1,fillOpacity:0.6
+        }).bindTooltip(`SED: ${obj.sed}<br>ALIM: ${obj.alim}<br>UT: ${obj.ut}`);
+        sedLayer.addLayer(mark);
+      }
     });
+  });
+
+function toggleSEDs(show){
+  if(show){ map.addLayer(sedLayer); }
+  else { map.removeLayer(sedLayer); }
 }
 
-// --------------------------------------------------
-// 🔹 FUNCIONES DE BÚSQUEDA (sin cambios)
-// --------------------------------------------------
+// --- CARGAR ATENCIONES DE 2024 Y 2025 ---
+const urlsAtenciones = [
+  "https://dl.dropboxusercontent.com/scl/fi/apuj5aek1sd4l8ytyeszx/ATENCIONDEF.csv?rlkey=4xc7p2stptclbku4bdwlxft8l&st=601n3suv", // 2025
+  "https://dl.dropboxusercontent.com/scl/fi/fjtukk004juggluv64m4j/ATENCION2024.csv?rlkey=v3a8g97dyleyi21f57xz8jgzl&st=vtfp9g5r" // 2024
+];
+
+Promise.all(urlsAtenciones.map(url => fetch(url).then(r => r.text())))
+  .then(respuestas => {
+    respuestas.forEach((texto, idx) => {
+      const lineas = texto.trim().split(/\r?\n/);
+      lineas.slice(1).forEach(l => {
+        const cols = l.split(";");
+        if (cols.length >= 8) {
+          const ticket = cols[0].replace(/"/g, "").trim();
+          const tipoTrabajo = cols[1].replace(/"/g, "").trim();
+          const tipo = cols[2].replace(/"/g, "").trim();
+          const fecha = cols[3].replace(/"/g, "").trim();
+          const alim = cols[4].replace(/"/g, "").trim();
+          const sed = cols[5].replace(/"/g, "").trim();
+          const cliente = cols[7].replace(/"/g, "").trim();
+          if (cliente) {
+            atenciones.push({
+              ticket,
+              tipo: `${tipoTrabajo} - ${tipo}`,
+              fecha,
+              alim,
+              sed,
+              cliente,
+              fuente: idx === 0 ? "2025" : "2024"
+            });
+          }
+        }
+      });
+    });
+    console.log("✅ Archivos de atenciones combinados:", atenciones.length, "registros totales");
+  })
+  .catch(err => console.error("❌ Error al cargar archivos de atenciones:", err));
+
+// --- FUNCIONES ---
 function buscarSuministro(){
   if(!datosListos){ resultado.textContent="⚠️ Espera a que termine la carga."; return; }
+  const num=searchBox.value.trim();
+  const encontrado=datos.find(d=>d.cliente===num);
+  if(encontrado){
+    ultimoEncontro=encontrado;
+    resultado.textContent="✅ Encontrado en "+encontrado.ut;
+    verEnGoogle.style.display="inline";
+    actualizarMapa(encontrado.lat,encontrado.lon,encontrado);
+    mostrarAtenciones(encontrado.cliente);
+  } else {
+    resultado.textContent="❌ Suministro no encontrado";
+    verEnGoogle.style.display="none";
+  }
+}
+
+function mostrarAtenciones(clienteID){
+  const lista=document.getElementById("listaAtenciones");
+  const panel=document.getElementById("panelAtenciones");
+  lista.innerHTML="";
+  panel.style.display="block";
+
+  const idLimpio=clienteID.trim().replace(/"/g,"");
+  const misAtenciones=atenciones.filter(a=>a.cliente===idLimpio);
+
+  if(misAtenciones.length===0){
+    lista.innerHTML=`<li class="list-group-item text-muted">Sin atenciones registradas para ${idLimpio}</li>`;
+    return;
+  }
+
+misAtenciones.sort((a, b) => new Date(b.fecha) - new Date(a.fecha)).forEach(a => {
+  const li = document.createElement("li");
+  li.className = "list-group-item mb-2";
+
+  // --- 🔹 Formatear fecha como dd/mm/aaaa ---
+  let fechaFormateada = a.fecha;
+  const fechaObj = new Date(a.fecha);
+  if (!isNaN(fechaObj)) {
+    const dia = String(fechaObj.getDate()).padStart(2, "0");
+    const mes = String(fechaObj.getMonth() + 1).padStart(2, "0");
+    const anio = fechaObj.getFullYear();
+    fechaFormateada = `${dia}/${mes}/${anio}`;
+  }
+
+  li.innerHTML = `
+    🧾 <b>${a.ticket}</b><br>
+    🛠️ <b>Tipo:</b> ${a.tipo}<br>
+    📅 <b>Fecha:</b> ${fechaFormateada}<br>
+    ⚡ <b>Alim:</b> ${a.alim}<br>
+    🏷️ <b>SED:</b> ${a.sed}
+  `;
+  lista.appendChild(li);
+});
+}
+
+// Actualizar mapa / marcador principal
+function actualizarMapa(lat,lon,encontrado){
+  if(marker) map.removeLayer(marker);
+  marker=L.marker([lat,lon],{title:"Cliente "+(encontrado.cliente||"")}).addTo(map);
+  marker.bindTooltip(`Cliente: ${encontrado.cliente}<br>UT: ${encontrado.ut}`).openTooltip();
+  map.setView([lat,lon],17,{animate:true});
+}
+
+// Abrir en Google Maps
+function abrirEnGoogleMaps(){ if(ultimoEncontro){ window.open(`https://www.google.com/maps/search/?api=1&query=${ultimoEncontro.lat},${ultimoEncontro.lon}`,'_blank'); }}
+function abrirEnGoogleMapsSED(){ if(ultimaSED){ window.open(`https://www.google.com/maps/search/?api=1&query=${ultimaSED.lat},${ultimaSED.lon}`,'_blank'); }}
+function toggleSidebar(){ sidebar.classList.toggle("hidden"); }
+</script>
+<script>
+// --- FUNCION AUXILIAR: calcular distancia (en metros aprox) ---
+function distancia(lat1, lon1, lat2, lon2) {
+  const R = 6371000; // radio tierra en metros
+  const dLat = (lat2-lat1) * Math.PI/180;
+  const dLon = (lon2-lon1) * Math.PI/180;
+  const a = 
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) *
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+}
+
+// --- FUNCION GENERAL PARA BUSCAR CERCANOS ---
+function obtenerCercanos(lat, lon, max = 4, limite = 20) {
+  const distancias = datos.map(d => ({
+    ...d,
+    dist: distancia(lat, lon, d.lat, d.lon)
+  }));
+  distancias.sort((a, b) => a.dist - b.dist);
+  return distancias.filter(d => d.dist < limite).slice(0, max);
+}
+
+// --- Limpiar markers cercanos previos ---
+function limpiarCercanos() {
+  cercanosMarkers.forEach(m => map.removeLayer(m));
+  cercanosMarkers = [];
+}
+
+// --- BUSCAR SUMINISTRO ---
+function buscarSuministro() {
+  if (!datosListos) { resultado.textContent="⚠️ Espera a que termine la carga."; return; }
   const num = searchBox.value.trim();
   const encontrado = datos.find(d => d.cliente === num);
-  if(encontrado){
+  const lista = document.getElementById("cercanos");
+  lista.innerHTML = "";
+  limpiarCercanos();
+
+  if (encontrado) {
     ultimoEncontro = encontrado;
     resultado.textContent = "✅ Encontrado en " + encontrado.ut;
     verEnGoogle.style.display = "inline";
     actualizarMapa(encontrado.lat, encontrado.lon, encontrado);
-    historial.unshift(encontrado);
-    if(historial.length > 3) historial.pop();
-    renderHistorial();
-    const cercanos = datos.filter(d => d!==encontrado)
-      .map(d=>({...d, dist:getDistance(encontrado.lat,encontrado.lon,d.lat,d.lon)}))
-      .filter(d=>d.dist<=0.02).sort((a,b)=>a.dist-b.dist).slice(0,5);
-    renderCercanos(cercanos);
+    mostrarAtenciones(encontrado.cliente);
+
+    // mostrar cercanos
+    const cercanos = obtenerCercanos(encontrado.lat, encontrado.lon);
+    cercanos.forEach(c => {
+      const li = document.createElement("li");
+      li.className = "list-group-item";
+      li.textContent = `${c.cliente} (${c.dist.toFixed(1)}m)`;
+      lista.appendChild(li);
+
+      // marcador en el mapa
+      const m = L.circleMarker([c.lat, c.lon], {radius:6, color:"red"}).addTo(map);
+      m.bindTooltip(`Cliente: ${c.cliente}<br>Distancia: ${c.dist.toFixed(1)}m`);
+      cercanosMarkers.push(m);
+    });
   } else {
-    resultado.textContent="❌ Suministro no encontrado";
-    verEnGoogle.style.display="none";
-    cercanos.innerHTML = historial.innerHTML = "";
+    resultado.textContent = "❌ Suministro no encontrado";
+    verEnGoogle.style.display = "none";
   }
 }
 
-function buscarSED(){
+// --- BUSCAR SED ---
+function buscarSED() {
   const nombre = searchSED.value.trim().toUpperCase();
-  const encontrado = sedDatos.find(d => d.sed === nombre);
-  if(encontrado){
+  const encontrado = sedDatos.find(s => s.sed === nombre);
+  const lista = document.getElementById("cercanosSED");
+  lista.innerHTML = "";
+  limpiarCercanos();
+  if(marker) map.removeLayer(marker);
+
+  if (encontrado) {
     ultimaSED = encontrado;
-    resultadoSED.innerHTML = `✅ <b>SED:</b> ${encontrado.sed}<br><b>ALIM:</b> ${encontrado.alim}<br><b>Clientes BT:</b> ${encontrado.clientesBT}<br><b>Tipo:</b> ${encontrado.tipo}<br><b>UT:</b> ${encontrado.ut}`;
+    resultadoSED.textContent = "✅ Encontrado SED " + encontrado.sed;
     verEnGoogleSED.style.display = "inline";
-    actualizarMapa(encontrado.lat, encontrado.lon, encontrado);
-    const cercanos = datos.map(d=>({...d, dist:getDistance(encontrado.lat,encontrado.lon,d.lat,d.lon)}))
-      .filter(d=>d.dist<=0.02).sort((a,b)=>a.dist-b.dist).slice(0,5);
-    renderCercanosSED(cercanos);
+    marker = L.marker([encontrado.lat, encontrado.lon],{title:"SED "+encontrado.sed}).addTo(map);
+    marker.bindTooltip(`SED: ${encontrado.sed}<br>UT: ${encontrado.ut}`).openTooltip();
+    map.setView([encontrado.lat, encontrado.lon], 17);
+
+    // mostrar cercanos a la SED
+    const cercanos = obtenerCercanos(encontrado.lat, encontrado.lon);
+    cercanos.forEach(c => {
+      const li = document.createElement("li");
+      li.className = "list-group-item";
+      li.textContent = `${c.cliente} (${c.dist.toFixed(1)}m)`;
+      lista.appendChild(li);
+
+      const m = L.circleMarker([c.lat, c.lon], {radius:6, color:"red"}).addTo(map);
+      m.bindTooltip(`Cliente: ${c.cliente}<br>Distancia: ${c.dist.toFixed(1)}m`);
+      cercanosMarkers.push(m);
+    });
   } else {
-    resultadoSED.textContent="❌ SED no encontrado";
-    verEnGoogleSED.style.display="none";
-    cercanosSED.innerHTML="";
+    resultadoSED.textContent = "❌ SED no encontrada";
+    verEnGoogleSED.style.display = "none";
   }
 }
 
-function buscarPorCoordenadas(){
-  if(!datosListos){ resultadoCoord.textContent="⚠️ Espera a que se carguen los datos."; return; }
-  const input = coordInput.value.trim();
-  if(!input){ resultadoCoord.textContent="⚠️ Ingresa coordenadas."; return; }
-  const partes = input.split(",");
-  if(partes.length<2){ resultadoCoord.textContent="⚠️ Formato inválido. Usa: lat, lon"; return; }
-  const lat=parseFloat(partes[0]), lon=parseFloat(partes[1]);
-  if(isNaN(lat)||isNaN(lon)){ resultadoCoord.textContent="⚠️ Coordenadas inválidas."; return; }
-  const cercanos = datos.map(d=>({...d,dist:getDistance(lat,lon,d.lat,d.lon)}))
-    .filter(d=>d.dist<=0.02).sort((a,b)=>a.dist-b.dist).slice(0,10);
-  resultadoCoord.innerHTML=`📍 Ubicación: <b>${lat.toFixed(6)}, ${lon.toFixed(6)}</b><br>`+
-    (cercanos.length?`✅ ${cercanos.length} suministros encontrados.`:"❌ Ninguno dentro de 20 m.");
-  renderCercanosCoord(cercanos);
-  actualizarMapa(lat, lon, {ut:"COORDENADA PEGADA"});
-}
-
-// --------------------------------------------------
-// 🔹 FUNCIONES DE INTERFAZ Y UTILIDADES
-// --------------------------------------------------
-function renderHistorial(){
-  const ul = document.getElementById("historial");
-  ul.innerHTML="";
-  historial.forEach(h=>{
-    const li=document.createElement("li");
-    li.className="list-group-item list-group-item-action";
-    li.textContent=h.cliente+" ("+h.ut+")";
-    li.onclick=()=>{searchBox.value=h.cliente; buscarSuministro();};
-    ul.appendChild(li);
-  });
-}
-
-function renderCercanos(lista){ 
-  const ul=cercanos; ul.innerHTML=""; 
-  cercanosMarkers.forEach(m=>map.removeLayer(m)); 
-  cercanosMarkers=[];
-  lista.forEach(c=>{
-    const li=document.createElement("li");
-    li.className="list-group-item fade-in";
-    li.textContent="Cliente "+c.cliente+" - "+(c.dist*1000).toFixed(1)+" m"; 
-    ul.appendChild(li);
-    let mark=L.circleMarker([c.lat,c.lon],{radius:6,color:"gray"}).addTo(map);
-    mark.bindTooltip("Cliente: "+c.cliente+"<br>UT: "+c.ut);
-    cercanosMarkers.push(mark);
-  });
-}
-
-function renderCercanosSED(lista){ 
-  const ul = cercanosSED; 
-  ul.innerHTML = ""; 
-
-  // Limpiar marcadores anteriores
-  cercanosMarkers.forEach(m => map.removeLayer(m)); 
-  cercanosMarkers = [];
-
-  lista.forEach(c => {
-    const li = document.createElement("li");
-    li.className = "list-group-item fade-in"; 
-    li.textContent = `Cliente ${c.cliente} - ${(c.dist * 1000).toFixed(1)} m`; 
-    ul.appendChild(li);
-
-    // 🔹 Agregar marcador en el mapa
-    const mark = L.circleMarker([c.lat, c.lon], { 
-      radius: 6, 
-      color: "orange", 
-      fillColor: "yellow", 
-      fillOpacity: 0.8 
-    }).addTo(map);
-
-    mark.bindTooltip(`Cliente: ${c.cliente}<br>UT: ${c.ut}<br>Dist: ${(c.dist*1000).toFixed(1)} m`);
-    cercanosMarkers.push(mark);
-  });
-}
-
-function renderCercanosCoord(lista){ 
-  const ul = cercanosCoord; 
-  ul.innerHTML = ""; 
-
-  // Limpiar marcadores anteriores
-  cercanosMarkers.forEach(m => map.removeLayer(m)); 
-  cercanosMarkers = [];
-
-  lista.forEach(c => {
-    const li = document.createElement("li");
-    li.className = "list-group-item fade-in"; 
-    li.textContent = `Cliente ${c.cliente} - ${(c.dist * 1000).toFixed(1)} m`; 
-    ul.appendChild(li);
-
-    // 🔹 Agregar marcador en el mapa
-    const mark = L.circleMarker([c.lat, c.lon], { 
-      radius: 6, 
-      color: "green", 
-      fillColor: "#6f6", 
-      fillOpacity: 0.8 
-    }).addTo(map);
-
-    mark.bindTooltip(`Cliente: ${c.cliente}<br>UT: ${c.ut}<br>Dist: ${(c.dist*1000).toFixed(1)} m`);
-    cercanosMarkers.push(mark);
-  });
-}
-
-function actualizarMapa(lat,lon,encontrado){
+// --- BUSCAR POR COORDENADAS ---
+function buscarPorCoordenadas() {
+  const valor = coordInput.value.trim();
+  const partes = valor.split(",");
+  const lista = document.getElementById("cercanosCoord");
+  lista.innerHTML = "";
+  limpiarCercanos();
   if(marker) map.removeLayer(marker);
-  marker=L.marker([lat,lon],{title:(encontrado.cliente?"Cliente "+encontrado.cliente:"SED "+(encontrado.sed||""))}).addTo(map);
-  marker.bindTooltip((encontrado.cliente?"Cliente: "+encontrado.cliente:"SED: "+(encontrado.sed||""))+"<br>UT: "+(encontrado.ut||"")).openTooltip();
-  map.setView([lat,lon],17,{animate:true});
-}
 
-function abrirEnGoogleMaps(){ if(ultimoEncontro){ window.open(`https://www.google.com/maps/search/?api=1&query=${ultimoEncontro.lat},${ultimoEncontro.lon}`,'_blank'); }}
-function abrirEnGoogleMapsSED(){ if(ultimaSED){ window.open(`https://www.google.com/maps/search/?api=1&query=${ultimaSED.lat},${ultimaSED.lon}`,'_blank'); }}
-function getDistance(lat1,lon1,lat2,lon2){ const R=6371,dLat=(lat2-lat1)*Math.PI/180,dLon=(lon2-lon1)*Math.PI/180;
-  const a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
-  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));}
-function toggleSidebar(){ sidebar.classList.toggle("hidden"); }
+  if (partes.length === 2) {
+    const lat = parseFloat(partes[0]);
+    const lon = parseFloat(partes[1]);
+    if (!isNaN(lat) && !isNaN(lon)) {
+      resultadoCoord.textContent = "✅ Coordenadas válidas";
+      marker = L.marker([lat, lon],{title:"Ubicación"}).addTo(map);
+      map.setView([lat, lon], 17);
+
+      const cercanos = obtenerCercanos(lat, lon);
+      cercanos.forEach(c => {
+        const li = document.createElement("li");
+        li.className = "list-group-item";
+        li.textContent = `${c.cliente} (${c.dist.toFixed(1)}m)`;
+        lista.appendChild(li);
+
+        const m = L.circleMarker([c.lat, c.lon], {radius:6, color:"red"}).addTo(map);
+        m.bindTooltip(`Cliente: ${c.cliente}<br>Distancia: ${c.dist.toFixed(1)}m`);
+        cercanosMarkers.push(m);
+      });
+      return;
+    }
+  }
+  resultadoCoord.textContent = "❌ Coordenadas inválidas";
+}
+// --- TOGGLE PANEL ATENCIONES ---
+const btnAtenciones = document.getElementById("toggleAtencionesBtn");
+const panelAtenciones = document.getElementById("panelAtenciones");
+
+btnAtenciones.addEventListener("click", () => {
+  panelAtenciones.classList.toggle("visible");
+
+  if (panelAtenciones.classList.contains("visible")) {
+    btnAtenciones.textContent = "❌ Cerrar";
+    btnAtenciones.classList.remove("btn-secondary");
+    btnAtenciones.classList.add("btn-danger");
+  } else {
+    btnAtenciones.textContent = "📋 Atenciones";
+    btnAtenciones.classList.remove("btn-danger");
+    btnAtenciones.classList.add("btn-secondary");
+  }
+});
 </script>
 </body>
 </html>
