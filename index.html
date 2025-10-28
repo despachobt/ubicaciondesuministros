@@ -48,9 +48,18 @@
 #panelAtenciones.visible {
   transform: translateX(0);
 }
+.sed-label {
+  font-size: 12px;
+  color: #0d6efd; /* azul */
+  font-weight: 600;
+  text-shadow: 1px 1px 2px white;
+  pointer-events: none; /* evita bloquear clics */
+  text-align: center;
+}
 </style>
 </head>
 <body>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <div id="loginScreen">
   <div id="loginBox">
     <img src="https://dl.dropboxusercontent.com/scl/fi/ymb0if0252ui58cy1voe2/logo-pluz.jpg?rlkey=ghj6tdtn6ccldppjyhj4a2zve&st=rnllbm7y" alt="Logo Pluz">
@@ -65,64 +74,86 @@
 <button class="btn btn-primary toggle-btn" onclick="toggleSidebar()">☰</button>
 
 <div id="sidebar">
-  <h4>🔎 Buscar suministro</h4>
-  <div class="input-group mb-2">
-    <input type="text" id="searchBox" class="form-control" placeholder="Número de cliente">
-    <button class="btn btn-success" onclick="buscarSuministro()">Buscar</button>
+  <h4>🧭 Buscador general</h4>
+<div id="progresoBox" class="mb-3">
+  <div class="progress">
+    <div id="progress-bar" class="progress-bar progress-bar-striped progress-bar-animated" 
+         role="progressbar" style="width: 0%">0%</div>
   </div>
-  <div id="resultado" class="text-success mb-2"></div>
-  <button id="verEnGoogle" class="btn btn-outline-primary btn-sm mb-3" style="display:none" onclick="abrirEnGoogleMaps()">Ver en Google Maps</button>
-  
-  <div id="progresoBox">
-    <h6>📂 Progreso de carga:</h6>
-    <div class="progress mb-2">
-      <div id="progress-bar" class="progress-bar progress-bar-striped progress-bar-animated" style="width:0%">0%</div>
-    </div>
-    <ul id="progreso" class="list-group small mb-3"></ul>
+  <ul id="progreso" class="list-group small mt-2"></ul>
+</div>
+  <!-- Selector de modo -->
+  <div class="mb-3">
+    <label for="modoBusqueda" class="form-label">Selecciona tipo de búsqueda:</label>
+    <select id="modoBusqueda" class="form-select" onchange="cambiarModoBusqueda()">
+      <option value="suministro" selected>🔎 Suministro</option>
+      <option value="sed">📡 SED</option>
+      <option value="coordenadas">📍 Coordenadas</option>
+    </select>
   </div>
 
-  <h6>📍 Suministros cercanos (&lt;20m):</h6>
-  <ul id="cercanos" class="list-group small mb-3"></ul>
-
-  <h6>🕑 Historial (últimos 3):</h6>
-  <ul id="historial" class="list-group small mb-3"></ul>
-
-  <h4>📡 Buscar SED</h4>
-  <div class="input-group mb-2">
-    <input type="text" id="searchSED" class="form-control" placeholder="Nombre de SED">
-    <button class="btn btn-warning" onclick="buscarSED()">Buscar</button>
+  <!-- Controles generales -->
+  <div class="mb-3">
+    <label for="radioInput" class="form-label">🎯 Radio de búsqueda (m):</label>
+    <input type="number" id="radioInput" class="form-control" value="20" min="5" max="200" step="5">
   </div>
-  <div id="resultadoSED" class="text-primary mb-2"></div>
-  <button id="verEnGoogleSED" class="btn btn-outline-warning btn-sm mb-3" style="display:none" onclick="abrirEnGoogleMapsSED()">Ver en Google Maps</button>
 
   <div class="form-check form-switch mb-3">
     <input class="form-check-input" type="checkbox" id="toggleSEDs" onchange="toggleSEDs(this.checked)">
-    <label class="form-check-label" for="toggleSEDs">Mostrar SEDs</label>
+    <label class="form-check-label" for="toggleSEDs">Mostrar todas las SEDs</label>
   </div>
 
-  <h6>🔎 Suministros cercanos al SED (&lt;20m):</h6>
-  <ul id="cercanosSED" class="list-group small mb-3"></ul>
-
-  <h4>📍 Buscar por coordenadas</h4>
-  <div class="input-group mb-2">
-    <input type="text" id="coordInput" class="form-control" placeholder="Ej: -11.872993, -77.114656">
-    <button class="btn btn-info" onclick="buscarPorCoordenadas()">Buscar</button>
+  <!-- 🔹 BLOQUE SUMINISTRO -->
+  <div id="bloqueSuministro">
+    <h5>🔎 Buscar suministro</h5>
+    <div class="input-group mb-2">
+      <input type="text" id="searchBox" class="form-control" placeholder="Número de cliente">
+      <button class="btn btn-success" onclick="buscarSuministro()">Buscar</button>
+    </div>
+    <div id="resultado" class="text-success mb-2"></div>
+    <button id="verEnGoogle" class="btn btn-outline-primary btn-sm mb-3" style="display:none" onclick="abrirEnGoogleMaps()">Ver en Google Maps</button>
+    <h6>📍 Suministros cercanos (<span id="radioLabel">20</span> m):</h6>
+    <ul id="cercanos" class="list-group small mb-3"></ul>
   </div>
-  <div id="resultadoCoord" class="text-primary small mb-2"></div>
-  <h6>🔎 Suministros cercanos (&lt;20m):</h6>
-  <ul id="cercanosCoord" class="list-group small mb-3"></ul>
-</div>
 
-<!-- Panel lateral derecho -->
-<div id="panelAtenciones">
-  <h5>📋 Atenciones del suministro</h5>
-  <ul id="listaAtenciones" class="list-group"></ul>
+  <!-- 🔹 BLOQUE SED -->
+  <div id="bloqueSED" style="display:none;">
+    <h5>📡 Buscar SED</h5>
+    <div class="input-group mb-2">
+      <input type="text" id="searchSED" class="form-control" placeholder="Nombre de SED">
+      <button class="btn btn-warning" onclick="buscarSED()">Buscar</button>
+    </div>
+    <div id="resultadoSED" class="text-primary mb-2"></div>
+    <button id="verEnGoogleSED" class="btn btn-outline-warning btn-sm mb-3" style="display:none" onclick="abrirEnGoogleMapsSED()">Ver en Google Maps</button>
+    <h6>📍 Suministros cercanos (<span id="radioLabel">20</span> m):</h6>
+    <ul id="cercanosSED" class="list-group small mb-3"></ul>
+  </div>
+
+  <!-- 🔹 BLOQUE COORDENADAS -->
+  <div id="bloqueCoord" style="display:none;">
+    <h5>📍 Buscar por coordenadas</h5>
+    <div class="input-group mb-2">
+      <input type="text" id="coordInput" class="form-control" placeholder="Ej: -11.872993, -77.114656">
+      <button class="btn btn-info" onclick="buscarPorCoordenadas()">Buscar</button>
+    </div>
+    <div id="resultadoCoord" class="text-primary small mb-2"></div>
+    <h6>📍 Suministros cercanos (<span id="radioLabel">20</span> m):</h6>
+    <ul id="cercanosCoord" class="list-group small mb-3"></ul>
+  </div>
+
+  <!-- Historial -->
+  <h6>🕑 Historial (últimos 3):</h6>
+  <ul id="historial" class="list-group small mb-3"></ul>
 </div>
 
 <button class="btn btn-secondary" id="toggleAtencionesBtn" 
         style="position:absolute; bottom:20px; right:20px; z-index:1600;">
   📋 Atenciones
 </button>
+<div id="panelAtenciones">
+  <h5>📋 Atenciones del suministro</h5>
+  <ul id="listaAtenciones" class="list-group"></ul>
+</div>
 <div id="map"></div>
 
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
@@ -215,10 +246,22 @@ fetch("https://dl.dropboxusercontent.com/scl/fi/f27szlfjhlid5luse9j7y/SED.csv?rl
           lat:parseFloat(cols[6].replace(",", ".").trim())
         };
         sedDatos.push(obj);
-        const mark=L.rectangle([[obj.lat-0.00005,obj.lon-0.00005],[obj.lat+0.00005,obj.lon+0.00005]],{
-          color:"blue",weight:1,fillOpacity:0.6
-        }).bindTooltip(`SED: ${obj.sed}<br>ALIM: ${obj.alim}<br>UT: ${obj.ut}`);
-        sedLayer.addLayer(mark);
+       // 🔹 Crear el rectángulo azul de la SED
+const mark = L.rectangle(
+  [[obj.lat - 0.00005, obj.lon - 0.00005], [obj.lat + 0.00005, obj.lon + 0.00005]],
+  { color: "blue", weight: 1, fillOpacity: 0.6 }
+).bindTooltip(`SED: ${obj.sed}<br>ALIM: ${obj.alim}<br>UT: ${obj.ut}`);
+sedLayer.addLayer(mark);
+
+// 🔹 Agregar etiqueta fija debajo de la SED
+const labelIcon = L.divIcon({
+  className: "sed-label",
+  html: `<div>${obj.sed}</div>`,
+  iconSize: [80, 20],
+  iconAnchor: [40, -10] // ajusta altura bajo el rectángulo
+});
+const labelMarker = L.marker([obj.lat, obj.lon], { icon: labelIcon, interactive: false });
+sedLayer.addLayer(labelMarker);
       }
     });
   });
@@ -266,23 +309,43 @@ Promise.all(urlsAtenciones.map(url => fetch(url).then(r => r.text())))
   })
   .catch(err => console.error("❌ Error al cargar archivos de atenciones:", err));
 
-// --- FUNCIONES ---
-function buscarSuministro(){
-  if(!datosListos){ resultado.textContent="⚠️ Espera a que termine la carga."; return; }
-  const num=searchBox.value.trim();
-  const encontrado=datos.find(d=>d.cliente===num);
-  if(encontrado){
-    ultimoEncontro=encontrado;
-    resultado.textContent="✅ Encontrado en "+encontrado.ut;
-    verEnGoogle.style.display="inline";
-    actualizarMapa(encontrado.lat,encontrado.lon,encontrado);
-    mostrarAtenciones(encontrado.cliente);
-  } else {
-    resultado.textContent="❌ Suministro no encontrado";
-    verEnGoogle.style.display="none";
-  }
-}
+// ============================
+// 🔹 CARGAR CLIENTES CADE1 Y CADE2
+// ============================
+let mapaClientes = {};
 
+Promise.all([
+  fetch("https://dl.dropboxusercontent.com/scl/fi/xmyi6f2rq043o5wppqaav/CLIENTES-CADE1.csv?rlkey=fd3etny0fp9no9083wt7w6lmb&st=1wzt8eo6").then(r => r.text()),
+  fetch("https://dl.dropboxusercontent.com/scl/fi/mdgj2b4eb82sibsc1vehk/CLIENTES-CADE2.csv?rlkey=oacn2n4qgqte8wv3cluqmyi8k&st=nb6tpxnk").then(r => r.text())
+])
+.then(([cade1Text, cade2Text]) => {
+  const parseCSV = (txt) =>
+    txt
+      .trim()
+      .split(/\r?\n/)
+      .slice(1)
+      .map(l => {
+        const cols = l.split(",");
+        return {
+          CLIENTE: cols[0]?.trim().replace(/"/g, ""),
+          ALIMCD: cols[1]?.trim().replace(/"/g, "")
+        };
+      })
+      .filter(c => c.CLIENTE);
+
+  const cade1 = parseCSV(cade1Text);
+  const cade2 = parseCSV(cade2Text);
+  const todos = [...cade1, ...cade2];
+
+  todos.forEach(c => {
+    mapaClientes[c.CLIENTE] = c.ALIMCD || "No disponible";
+  });
+
+  console.log("✅ CLIENTES-CADE cargados correctamente:", Object.keys(mapaClientes).length);
+})
+.catch(err => console.error("❌ Error al cargar CLIENTES-CADE:", err));
+
+// --- FUNCIONES ---
 function mostrarAtenciones(clienteID){
   const lista=document.getElementById("listaAtenciones");
   const panel=document.getElementById("panelAtenciones");
@@ -350,7 +413,8 @@ function distancia(lat1, lon1, lat2, lon2) {
 }
 
 // --- FUNCION GENERAL PARA BUSCAR CERCANOS ---
-function obtenerCercanos(lat, lon, max = 4, limite = 20) {
+function obtenerCercanos(lat, lon, max = 5) {
+  const limite = parseFloat(document.getElementById("radioInput").value) || 20;
   const distancias = datos.map(d => ({
     ...d,
     dist: distancia(lat, lon, d.lat, d.lon)
@@ -375,8 +439,12 @@ function buscarSuministro() {
   limpiarCercanos();
 
   if (encontrado) {
-    ultimoEncontro = encontrado;
-    resultado.textContent = "✅ Encontrado en " + encontrado.ut;
+  ultimoEncontro = encontrado;
+  const alimCd = mapaClientes[encontrado.cliente] || "No disponible";
+  resultado.innerHTML = `✅ Encontrado CLIENTE <b>${encontrado.cliente}</b><br>
+                         📡 <b>${alimCd}<br>
+                         🗂️ ${encontrado.ut}`;
+
     verEnGoogle.style.display = "inline";
     actualizarMapa(encontrado.lat, encontrado.lon, encontrado);
     mostrarAtenciones(encontrado.cliente);
@@ -384,16 +452,25 @@ function buscarSuministro() {
     // mostrar cercanos
     const cercanos = obtenerCercanos(encontrado.lat, encontrado.lon);
     cercanos.forEach(c => {
-      const li = document.createElement("li");
-      li.className = "list-group-item";
-      li.textContent = `${c.cliente} (${c.dist.toFixed(1)}m)`;
-      lista.appendChild(li);
+  const alimCdCercano = mapaClientes[c.cliente] || "No disponible";
+  const li = document.createElement("li");
+  li.className = "list-group-item";
+  li.innerHTML = `
+    <b>${c.cliente}</b><br>
+    📡 <span class="text-primary">${alimCdCercano}</span><br>
+    📏 ${c.dist.toFixed(1)} m
+  `;
+  lista.appendChild(li);
 
-      // marcador en el mapa
-      const m = L.circleMarker([c.lat, c.lon], {radius:6, color:"red"}).addTo(map);
-      m.bindTooltip(`Cliente: ${c.cliente}<br>Distancia: ${c.dist.toFixed(1)}m`);
-      cercanosMarkers.push(m);
-    });
+  // marcador en el mapa
+  const m = L.circleMarker([c.lat, c.lon], { radius: 6, color: "red" }).addTo(map);
+  m.bindTooltip(`
+    Cliente: ${c.cliente}<br>
+    ALIM CD: ${alimCdCercano}<br>
+    Distancia: ${c.dist.toFixed(1)}m
+  `);
+  cercanosMarkers.push(m);
+});
   } else {
     resultado.textContent = "❌ Suministro no encontrado";
     verEnGoogle.style.display = "none";
@@ -411,8 +488,25 @@ function buscarSED() {
 
   if (encontrado) {
     ultimaSED = encontrado;
-    resultadoSED.textContent = "✅ Encontrado SED " + encontrado.sed;
+
+    // 🟡 Mostrar resultado con alimentador al costado
+    const alimTexto = encontrado.alim ? ` (${encontrado.alim})` : "";
+    resultadoSED.innerHTML = `✅ Encontrado SED <b>${encontrado.sed}</b>${alimTexto}`;
     verEnGoogleSED.style.display = "inline";
+
+// --- Botón para ver detalle de SED ---
+let btnDetalle = document.getElementById("btnDetalleSED");
+if (!btnDetalle) {
+  btnDetalle = document.createElement("button");
+  btnDetalle.id = "btnDetalleSED";
+  btnDetalle.className = "btn btn-outline-secondary btn-sm mb-3 ms-2";
+  btnDetalle.textContent = "🔍 Detalle SED";
+  btnDetalle.onclick = () => mostrarDetalleSED(encontrado.sed);
+  resultadoSED.insertAdjacentElement("afterend", btnDetalle);
+} else {
+  btnDetalle.onclick = () => mostrarDetalleSED(encontrado.sed);
+  btnDetalle.style.display = "inline";
+}
     marker = L.marker([encontrado.lat, encontrado.lon],{title:"SED "+encontrado.sed}).addTo(map);
     marker.bindTooltip(`SED: ${encontrado.sed}<br>UT: ${encontrado.ut}`).openTooltip();
     map.setView([encontrado.lat, encontrado.lon], 17);
@@ -420,15 +514,32 @@ function buscarSED() {
     // mostrar cercanos a la SED
     const cercanos = obtenerCercanos(encontrado.lat, encontrado.lon);
     cercanos.forEach(c => {
-      const li = document.createElement("li");
-      li.className = "list-group-item";
-      li.textContent = `${c.cliente} (${c.dist.toFixed(1)}m)`;
-      lista.appendChild(li);
+  const alimCdCercano = mapaClientes[c.cliente] || "No disponible";
+  const li = document.createElement("li");
+  li.className = "list-group-item";
+  li.innerHTML = `
+    <b>${c.cliente}</b><br>
+    📡 <span class="text-primary">${alimCdCercano}</span><br>
+    📏 ${c.dist.toFixed(1)} m
+  `;
+  lista.appendChild(li);
 
-      const m = L.circleMarker([c.lat, c.lon], {radius:6, color:"red"}).addTo(map);
-      m.bindTooltip(`Cliente: ${c.cliente}<br>Distancia: ${c.dist.toFixed(1)}m`);
-      cercanosMarkers.push(m);
-    });
+  // marcador en el mapa con tooltip
+  const m = L.circleMarker([c.lat, c.lon], {
+    radius: 6,
+    color: "red",
+    weight: 1.5,
+    fillOpacity: 0.7
+  }).addTo(map);
+
+  m.bindTooltip(`
+    <b>Cliente:</b> ${c.cliente}<br>
+    <b>ALIM CD:</b> ${alimCdCercano}<br>
+    <b>Distancia:</b> ${c.dist.toFixed(1)}m
+  `);
+
+  cercanosMarkers.push(m);
+});
   } else {
     resultadoSED.textContent = "❌ SED no encontrada";
     verEnGoogleSED.style.display = "none";
@@ -454,15 +565,34 @@ function buscarPorCoordenadas() {
 
       const cercanos = obtenerCercanos(lat, lon);
       cercanos.forEach(c => {
-        const li = document.createElement("li");
-        li.className = "list-group-item";
-        li.textContent = `${c.cliente} (${c.dist.toFixed(1)}m)`;
-        lista.appendChild(li);
+  const alimCdCercano = mapaClientes[c.cliente] || "No disponible";
 
-        const m = L.circleMarker([c.lat, c.lon], {radius:6, color:"red"}).addTo(map);
-        m.bindTooltip(`Cliente: ${c.cliente}<br>Distancia: ${c.dist.toFixed(1)}m`);
-        cercanosMarkers.push(m);
-      });
+  // 🧾 agregar a la lista
+  const li = document.createElement("li");
+  li.className = "list-group-item";
+  li.innerHTML = `
+    <b>${c.cliente}</b><br>
+    📡 <span class="text-primary">${alimCdCercano}</span><br>
+    📏 ${c.dist.toFixed(1)} m
+  `;
+  lista.appendChild(li);
+
+  // 📍 marcador con tooltip en el mapa
+  const m = L.circleMarker([c.lat, c.lon], {
+    radius: 6,
+    color: "red",
+    weight: 1.5,
+    fillOpacity: 0.7
+  }).addTo(map);
+
+  m.bindTooltip(`
+    <b>Cliente:</b> ${c.cliente}<br>
+    <b>ALIM CD:</b> ${alimCdCercano}<br>
+    <b>Distancia:</b> ${c.dist.toFixed(1)}m
+  `);
+
+  cercanosMarkers.push(m);
+});
       return;
     }
   }
@@ -485,6 +615,98 @@ btnAtenciones.addEventListener("click", () => {
     btnAtenciones.classList.add("btn-secondary");
   }
 });
+
+// ============================
+// 🔹 CARGAR ARCHIVO SED_CLIENTES
+// ============================
+let sedClientes = [];
+
+fetch("https://dl.dropboxusercontent.com/scl/fi/z8sr9bae1ds4myo7dmbni/SED_CLIENTES.csv?rlkey=3d7xy5746v3a3lpemiorp7sj0&st=bcf3izrn")
+  .then(r => r.text())
+  .then(texto => {
+    const lineas = texto.trim().split(/\r?\n/);
+    lineas.slice(1).forEach(l => {
+      const cols = l.split(",");
+      if (cols.length >= 3) {
+        sedClientes.push({
+          sed: cols[0].trim().toUpperCase(),
+          llave: cols[1].trim(),
+          clientes: parseInt(cols[2]) || 0
+        });
+      }
+    });
+    console.log("✅ Archivo SED_CLIENTES cargado:", sedClientes.length, "registros");
+  })
+  .catch(err => console.error("❌ Error al cargar SED_CLIENTES:", err));
+
+
+// ============================
+// 🔹 MOSTRAR DETALLE DE UNA SED
+// ============================
+function mostrarDetalleSED(nombreSED) {
+  const modal = new bootstrap.Modal(document.getElementById("detalleSEDModal"));
+  const tabla = document.getElementById("tablaDetalleSED");
+  const titulo = document.getElementById("detalleSEDNombre");
+  const totalDiv = document.getElementById("totalClientesSED");
+
+  tabla.innerHTML = "";
+  totalDiv.textContent = "";
+  titulo.textContent = "SED: " + nombreSED;
+
+  const registros = sedClientes.filter(s => s.sed === nombreSED);
+  if (registros.length === 0) {
+    tabla.innerHTML = `<tr><td colspan="2" class="text-muted">Sin información disponible</td></tr>`;
+    modal.show();
+    return;
+  }
+
+  let total = 0;
+  registros.forEach(r => {
+    total += r.clientes;
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${r.llave}</td><td>${r.clientes}</td>`;
+    tabla.appendChild(tr);
+  });
+
+  totalDiv.textContent = `Total de clientes: ${total}`;
+  modal.show();
+}
+// Actualizar etiqueta visual del radio
+const radioInput = document.getElementById("radioInput");
+const radioLabel = document.getElementById("radioLabel");
+
+radioInput.addEventListener("input", () => {
+  radioLabel.textContent = radioInput.value;
+});
+function cambiarModoBusqueda() {
+  const modo = document.getElementById("modoBusqueda").value;
+  document.getElementById("bloqueSuministro").style.display = (modo === "suministro") ? "block" : "none";
+  document.getElementById("bloqueSED").style.display = (modo === "sed") ? "block" : "none";
+  document.getElementById("bloqueCoord").style.display = (modo === "coordenadas") ? "block" : "none";
+}
+
 </script>
+<!-- MODAL DETALLE SED -->
+<div class="modal fade" id="detalleSEDModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-warning">
+        <h5 class="modal-title">🔍 Detalle de SED</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <h6 id="detalleSEDNombre" class="text-primary mb-3"></h6>
+        <table class="table table-sm table-striped">
+          <thead>
+            <tr><th>Llave</th><th>Clientes</th></tr>
+          </thead>
+          <tbody id="tablaDetalleSED"></tbody>
+        </table>
+        <div id="totalClientesSED" class="fw-bold text-end"></div>
+      </div>
+</div>
+</div>
+</div>
+</div>
 </body>
 </html>
