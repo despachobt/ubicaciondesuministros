@@ -152,6 +152,10 @@
 </button>
 <div id="panelAtenciones">
   <h5>📋 Atenciones del suministro</h5>
+<button class="btn btn-success btn-sm mb-3 w-100"
+        onclick="exportarAtencionesExcel()">
+  📥 Exportar a Excel
+</button>
   <ul id="listaAtenciones" class="list-group"></ul>
 </div>
 <div id="map"></div>
@@ -162,6 +166,7 @@ let datos = [], sedDatos = [], historial = [], cercanosMarkers = [], atenciones 
 let ultimoEncontro = null, ultimaSED = null, map, marker;
 let sedLayer = L.layerGroup();
 let cargados = 0, datosListos = false;
+let clienteActualAtenciones = null;
 
 // Inicializa mapa
 map = L.map('map').setView([-11.95, -76.95], 8);
@@ -352,8 +357,12 @@ function mostrarAtenciones(clienteID){
   lista.innerHTML="";
   panel.style.display="block";
 
-  const idLimpio=clienteID.trim().replace(/"/g,"");
-  const misAtenciones=atenciones.filter(a=>a.cliente===idLimpio);
+  const idLimpio = clienteID.trim().replace(/"/g,"");
+
+  // 🔹 GUARDAR CLIENTE ACTUAL
+  clienteActualAtenciones = idLimpio;
+
+  const misAtenciones = atenciones.filter(a => a.cliente === idLimpio);
 
   if(misAtenciones.length===0){
     lista.innerHTML=`<li class="list-group-item text-muted">Sin atenciones registradas para ${idLimpio}</li>`;
@@ -685,6 +694,38 @@ function cambiarModoBusqueda() {
   document.getElementById("bloqueCoord").style.display = (modo === "coordenadas") ? "block" : "none";
 }
 
+function exportarAtencionesExcel() {
+  if (!clienteActualAtenciones) {
+    alert("No hay suministro seleccionado");
+    return;
+  }
+
+  const filas = atenciones
+    .filter(a => a.cliente === clienteActualAtenciones)
+    .sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+
+  if (filas.length === 0) {
+    alert("Este suministro no tiene atenciones");
+    return;
+  }
+
+  let csv = "Ticket;Tipo;Fecha;Alimentador;SED;Fuente\n";
+
+  filas.forEach(a => {
+    csv += `"${a.ticket}";"${a.tipo}";"${a.fecha}";"${a.alim}";"${a.sed}";"${a.fuente}"\n`;
+  });
+
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `Atenciones_${clienteActualAtenciones}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
 </script>
 <!-- MODAL DETALLE SED -->
 <div class="modal fade" id="detalleSEDModal" tabindex="-1">
@@ -710,6 +751,7 @@ function cambiarModoBusqueda() {
 </div>
 </body>
 </html>
+
 
 
 
