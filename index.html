@@ -59,6 +59,12 @@
 input[type=range] {
   accent-color: #0d6efd; /* azul bootstrap */
 }
+/* 🔶 ICONO SAP */
+.sap-icon {
+  font-size: 34px;
+  filter: drop-shadow(0 0 4px orange);
+  cursor: pointer;
+}
 </style>
 </head>
 <body>
@@ -185,6 +191,15 @@ let clienteActualAtenciones = null;
 let mapaSAP = {};              // cliente -> SAP
 let capaSAP = L.layerGroup();  // capa Leaflet
 let sapVisible = false;
+
+// 🔶 ICONO SAP 
+const iconoSAP = L.divIcon({
+  className: "sap-icon",
+  html: "💡",
+  iconSize: [36, 36],
+  iconAnchor: [18, 18],
+  popupAnchor: [0, -18]
+});
 
 // Inicializa mapa
 map = L.map('map').setView([-11.95, -76.95], 8);
@@ -441,16 +456,18 @@ function crearCapaSAP() {
     const sap = mapaSAP[d.cliente];
     if (!sap) return;
 
-    const marker = L.circleMarker([d.lat, d.lon], estiloSAP);
+    const popupSAP = `
+      <b>🧾 SAP</b><br>
+      <span style="font-size:14px;"><b>${sap}</b></span><br>
+      <button class="btn btn-sm btn-warning mt-1"
+              onclick="copiarSAP('${sap}')">
+        📋 Copiar SAP
+      </button>
+    `;
 
-    marker.bindTooltip(`
-      <b>🧾 SAP:</b> ${sap}<br>
-      <b>Cliente:</b> ${d.cliente}<br>
-      <b>UT:</b> ${d.ut}
-    `, {
-      sticky: true,
-      opacity: 0.95
-    });
+    const marker = L.marker([d.lat, d.lon], {
+      icon: iconoSAP
+    }).bindPopup(popupSAP);
 
     capaSAP.addLayer(marker);
   });
@@ -831,7 +848,11 @@ function exportarAtencionesExcel() {
   link.click();
   document.body.removeChild(link);
 }
-
+function copiarSAP(sap) {
+  navigator.clipboard.writeText(sap).then(() => {
+    alert("✅ SAP copiado: " + sap);
+  });
+}
 </script>
 <!-- MODAL DETALLE SED -->
 <div class="modal fade" id="detalleSEDModal" tabindex="-1">
