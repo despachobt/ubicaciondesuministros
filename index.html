@@ -107,6 +107,9 @@ input[type=range] {
   </div>
 
   <div class="form-check form-switch mb-3">
+<button id="btnSAP" class="btn btn-warning btn-sm w-100 mb-3">
+  🧾 Mostrar SAP
+</button>
     <input class="form-check-input" type="checkbox" id="toggleSEDs" onchange="toggleSEDs(this.checked)">
     <label class="form-check-label" for="toggleSEDs">Mostrar todas las SEDs</label>
   </div>
@@ -176,12 +179,34 @@ let sedLayer = L.layerGroup();
 let cargados = 0, datosListos = false;
 let clienteActualAtenciones = null;
 
+// ============================
+// 🔶 CAPA SAP (OCULTA)
+// ============================
+let mapaSAP = {};              // cliente -> SAP
+let capaSAP = L.layerGroup();  // capa Leaflet
+let sapVisible = false;
+
 // Inicializa mapa
 map = L.map('map').setView([-11.95, -76.95], 8);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: 'Map data © OpenStreetMap contributors'
 }).addTo(map);
+// ============================
+// 🔶 BOTÓN MOSTRAR / OCULTAR SAP
+// ============================
+document.getElementById("btnSAP").addEventListener("click", () => {
+  const btn = document.getElementById("btnSAP");
 
+  if (!sapVisible) {
+    map.addLayer(capaSAP);
+    btn.textContent = "❌ Ocultar SAP";
+  } else {
+    map.removeLayer(capaSAP);
+    btn.textContent = "🧾 Mostrar SAP";
+  }
+
+  sapVisible = !sapVisible;
+});
 const usuarios = [{user:"despachobt", pass:"Pluz2025"}];
 function login(){
   const u=user.value.trim(), p=pass.value.trim();
@@ -196,23 +221,30 @@ const urls = [
   {nombre:"PANAMERICANA",url:"https://dl.dropboxusercontent.com/scl/fi/qpt0c6dqyhututunxgby5/PANAMERICANA.csv?rlkey=gtkcg709xhcohqdu70v8fzo16"}
 ];
 
-function actualizarProgreso(){
+function actualizarProgreso() {
   cargados++;
-  const bar=document.getElementById("progress-bar");
-  const porcentaje=Math.round((cargados/urls.length)*100);
-  bar.style.width=porcentaje+"%";
-  bar.textContent=porcentaje+"%";
-  if(cargados===urls.length){
-    datosListos=true;
+  const bar = document.getElementById("progress-bar");
+  const porcentaje = Math.round((cargados / urls.length) * 100);
+
+  bar.style.width = porcentaje + "%";
+  bar.textContent = porcentaje + "%";
+
+  if (cargados === urls.length) {
+    datosListos = true;
+    crearCapaSAP(); // 🔶 SAP cuando ya hay coordenadas
+
     bar.classList.remove("progress-bar-animated");
-    const li=document.createElement("li");
-    li.className="list-group-item text-success";
-    li.textContent="✅ Todos los archivos cargados con éxito.";
+
+    const li = document.createElement("li");
+    li.className = "list-group-item text-success";
+    li.textContent = "✅ Todos los archivos cargados con éxito.";
     progreso.appendChild(li);
-    setTimeout(()=>{progresoBox.style.display="none";},2000);
+
+    setTimeout(() => {
+      progresoBox.style.display = "none";
+    }, 2000);
   }
 }
-
 // Cargar suministros
 urls.forEach(f=>{
   fetch(f.url).then(r=>r.text()).then(texto=>{
@@ -221,7 +253,7 @@ urls.forEach(f=>{
       const cols=l.trim().split(";");
       if(cols.length>=4){
         datos.push({
-          cliente:cols[0].trim(),
+          cliente: cols[0].trim().replace(/^0+/, ""),
           ut:cols[1].trim(),
           lat:parseFloat(cols[2].replace(",", ".")),
           lon:parseFloat(cols[3].replace(",", "."))
@@ -355,8 +387,74 @@ Promise.all([
   });
 
   console.log("✅ CLIENTES-CADE cargados correctamente:", Object.keys(mapaClientes).length);
+// ============================
+// 🔶 CARGAR SAP DESDE GOOGLE SHEETS
+// ============================
+fetch("https://docs.google.com/spreadsheets/d/1O00gmsXQH1_Q_wf1s7Cb5trM1HESBAT7NlaD9XnHaOA/gviz/tq?tqx=out:csv&sheet=SAP")
+  .then(r => r.text())
+  .then(texto => {
+    const lineas = texto.trim().split(/\r?\n/);
+
+    console.log("📄 Filas CSV SAP:", lineas.length);
+
+    lineas.slice(1).forEach(l => {
+      const cols = l.split(","); // ✅ NO REEMPLAZAR
+
+      if (cols.length < 2) return;
+
+      const cliente = cols[0]
+        .replace(/"/g, "")
+        .trim()
+        .replace(/^0+/, "");
+
+      const sap = cols[1]
+        .replace(/"/g, "")
+        .trim();
+
+      if (cliente && sap) {
+        mapaSAP[cliente] = sap;
+      }
+    });
+
+    console.log("✅ SAP cargados:", Object.keys(mapaSAP).length);
+
+    crearCapaSAP(); // 🔶 dibujar SAP
+  })
+  .catch(err => console.error("❌ Error al cargar SAP:", err));
 })
 .catch(err => console.error("❌ Error al cargar CLIENTES-CADE:", err));
+// ============================
+// 🔶 ESTILO SAP
+// ============================
+const estiloSAP = {
+  radius: 7,
+  color: "#ff7a00",
+  weight: 2,
+  fillColor: "#ffb74d",
+  fillOpacity: 0.9
+};
+
+function crearCapaSAP() {
+  capaSAP.clearLayers();
+
+  datos.forEach(d => {
+    const sap = mapaSAP[d.cliente];
+    if (!sap) return;
+
+    const marker = L.circleMarker([d.lat, d.lon], estiloSAP);
+
+    marker.bindTooltip(`
+      <b>🧾 SAP:</b> ${sap}<br>
+      <b>Cliente:</b> ${d.cliente}<br>
+      <b>UT:</b> ${d.ut}
+    `, {
+      sticky: true,
+      opacity: 0.95
+    });
+
+    capaSAP.addLayer(marker);
+  });
+}
 
 // --- FUNCIONES ---
 function mostrarAtenciones(clienteID){
