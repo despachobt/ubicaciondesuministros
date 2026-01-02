@@ -112,14 +112,15 @@ input[type=range] {
        min="5" max="200" step="5" value="20">
   </div>
 
-  <div class="form-check form-switch mb-3">
-<button id="btnSAP" class="btn btn-warning btn-sm w-100 mb-3">
-  🧾 Mostrar SAP
-</button>
-    <input class="form-check-input" type="checkbox" id="toggleSEDs" onchange="toggleSEDs(this.checked)">
-    <label class="form-check-label" for="toggleSEDs">Mostrar todas las SEDs</label>
-  </div>
+  <div class="mb-3">
+  <button id="btnSAP" class="btn btn-warning btn-sm w-100 mb-2">
+    🧾 Mostrar SAP
+  </button>
 
+  <button id="btnSED" class="btn btn-primary btn-sm w-100">
+    📡 Mostrar SEDs
+  </button>
+</div>
   <!-- 🔹 BLOQUE SUMINISTRO -->
   <div id="bloqueSuministro">
     <h5>🔎 Buscar suministro</h5>
@@ -182,6 +183,7 @@ input[type=range] {
 let datos = [], sedDatos = [], historial = [], cercanosMarkers = [], atenciones = [];
 let ultimoEncontro = null, ultimaSED = null, map, marker;
 let sedLayer = L.layerGroup();
+let sedVisible = false;
 let cargados = 0, datosListos = false;
 let clienteActualAtenciones = null;
 
@@ -209,6 +211,9 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 // ============================
 // 🔶 BOTÓN MOSTRAR / OCULTAR SAP
 // ============================
+// ============================
+// 🔶 BOTÓN MOSTRAR / OCULTAR SAP
+// ============================
 document.getElementById("btnSAP").addEventListener("click", () => {
   const btn = document.getElementById("btnSAP");
 
@@ -221,6 +226,23 @@ document.getElementById("btnSAP").addEventListener("click", () => {
   }
 
   sapVisible = !sapVisible;
+});
+
+// ============================
+// 🔷 BOTÓN MOSTRAR / OCULTAR SEDs
+// ============================
+document.getElementById("btnSED").addEventListener("click", () => {
+  const btn = document.getElementById("btnSED");
+
+  if (!sedVisible) {
+    map.addLayer(sedLayer);
+    btn.textContent = "❌ Ocultar SEDs";
+  } else {
+    map.removeLayer(sedLayer);
+    btn.textContent = "📡 Mostrar SEDs";
+  }
+
+  sedVisible = !sedVisible;
 });
 const usuarios = [{user:"despachobt", pass:"Pluz2025"}];
 function login(){
@@ -325,11 +347,6 @@ sedLayer.addLayer(labelMarker);
       }
     });
   });
-
-function toggleSEDs(show){
-  if(show){ map.addLayer(sedLayer); }
-  else { map.removeLayer(sedLayer); }
-}
 
 // --- CARGAR ATENCIONES DE 2024 Y 2025 ---
 const urlsAtenciones = [
