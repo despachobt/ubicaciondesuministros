@@ -117,11 +117,16 @@ input[type=range] {
     🧾 Mostrar SAP
   </button>
 
-  <button id="btnSED" class="btn btn-primary btn-sm w-100">
-    📡 Mostrar SEDs
-  </button>
+  <button id="btnSED" class="btn btn-primary btn-sm w-100 mb-2">
+  📡 Mostrar SEDs
+</button>
+
+<button id="btnComparar" class="btn btn-danger btn-sm w-100">
+  📏 Comparar distancia
+</button>
+
 </div>
-  <!-- 🔹 BLOQUE SUMINISTRO -->
+<!-- 🔹 BLOQUE SUMINISTRO -->
   <div id="bloqueSuministro">
     <h5>🔎 Buscar suministro</h5>
     <div class="input-group mb-2">
@@ -158,7 +163,7 @@ input[type=range] {
     <h6>📍 Suministros cercanos:</h6>
     <ul id="cercanosCoord" class="list-group small mb-3"></ul>
   </div>
-
+  
   <!-- Historial -->
   <h6> </h6>
   <ul id="historial" class="list-group small mb-3"></ul>
@@ -181,6 +186,12 @@ input[type=range] {
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script>
 let datos = [], sedDatos = [], historial = [], cercanosMarkers = [], atenciones = [];
+// ============================
+// 📏 COMPARAR DISTANCIAS
+// ============================
+let modoComparar = false;
+let puntosComparar = [];
+let capaComparacion = L.layerGroup();
 let ultimoEncontro = null, ultimaSED = null, map, marker;
 let sedLayer = L.layerGroup();
 let sedVisible = false;
@@ -231,6 +242,21 @@ document.getElementById("btnSAP").addEventListener("click", () => {
 // ============================
 // 🔷 BOTÓN MOSTRAR / OCULTAR SEDs
 // ============================
+// 🔷 BOTÓN COMPARAR DISTANCIA
+document.getElementById("btnComparar").addEventListener("click", () => {
+  modoComparar = !modoComparar;
+  puntosComparar = [];
+  capaComparacion.clearLayers();
+
+  if (modoComparar) {
+    capaComparacion.addTo(map);
+    alert("📏 Modo comparación activo. Selecciona dos puntos.");
+  } else {
+    map.removeLayer(capaComparacion);
+  }
+});
+
+// 🔷 BOTÓN MOSTRAR / OCULTAR SEDs
 document.getElementById("btnSED").addEventListener("click", () => {
   const btn = document.getElementById("btnSED");
 
@@ -244,6 +270,7 @@ document.getElementById("btnSED").addEventListener("click", () => {
 
   sedVisible = !sedVisible;
 });
+
 const usuarios = [{user:"despachobt", pass:"Pluz2025"}];
 function login(){
   const u=user.value.trim(), p=pass.value.trim();
@@ -334,7 +361,9 @@ const mark = L.rectangle(
   { color: "blue", weight: 1, fillOpacity: 0.6 }
 ).bindTooltip(`SED: ${obj.sed}<br>ALIM: ${obj.alim}<br>UT: ${obj.ut}`);
 sedLayer.addLayer(mark);
-
+mark.on("click", () => {
+  registrarComparacion(obj.lat, obj.lon, "SED");
+});
 // 🔹 Agregar etiqueta fija debajo de la SED
 const labelIcon = L.divIcon({
   className: "sed-label",
@@ -537,11 +566,26 @@ misAtenciones.sort((a, b) => new Date(b.fecha) - new Date(a.fecha)).forEach(a =>
 // Actualizar mapa / marcador principal
 function actualizarMapa(lat,lon,encontrado){
   if(marker) map.removeLayer(marker);
-  marker=L.marker([lat,lon],{title:"Cliente "+(encontrado.cliente||"")}).addTo(map);
-  marker.bindTooltip(`Cliente: ${encontrado.cliente}<br>UT: ${encontrado.ut}`).openTooltip();
+
+  marker = L.marker([lat,lon],{
+    title:"Cliente "+(encontrado.cliente||"")
+  }).addTo(map);
+
+  marker.bindTooltip(
+    `Cliente: ${encontrado.cliente}<br>UT: ${encontrado.ut}`
+  ).openTooltip();
+
+  // 📏 COMPARAR DISTANCIA
+  marker.on("click", () => {
+  registrarComparacion(
+    lat,
+    lon,
+    "Suministro",
+    encontrado.cliente
+  );
+});
   map.setView([lat,lon],17,{animate:true});
 }
-
 // Abrir en Google Maps
 function abrirEnGoogleMaps(){ if(ultimoEncontro){ window.open(`https://www.google.com/maps/search/?api=1&query=${ultimoEncontro.lat},${ultimoEncontro.lon}`,'_blank'); }}
 function abrirEnGoogleMapsSED(){ if(ultimaSED){ window.open(`https://www.google.com/maps/search/?api=1&query=${ultimaSED.lat},${ultimaSED.lon}`,'_blank'); }}
@@ -549,18 +593,47 @@ function toggleSidebar(){ sidebar.classList.toggle("hidden"); }
 </script>
 <script>
 // --- FUNCION AUXILIAR: calcular distancia (en metros aprox) ---
+// 📏 DISTANCIA (metros)
 function distancia(lat1, lon1, lat2, lon2) {
-  const R = 6371000; // radio tierra en metros
-  const dLat = (lat2-lat1) * Math.PI/180;
-  const dLon = (lon2-lon1) * Math.PI/180;
-  const a = 
-    Math.sin(dLat/2) * Math.sin(dLat/2) +
-    Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) *
-    Math.sin(dLon/2) * Math.sin(dLon/2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-  return R * c;
+  const R = 6371000;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * Math.PI / 180) *
+    Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) ** 2;
+
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+// 📍 REGISTRAR PUNTOS DE COMPARACIÓN
+function registrarComparacion(lat, lon, tipo, detalle = "") {
+  if (!modoComparar) return;
+
+  puntosComparar.push({ lat, lon });
+
+  const texto = detalle ? `📍 ${tipo}: ${detalle}` : `📍 ${tipo}`;
+
+  L.marker([lat, lon])
+    .bindTooltip(texto, { permanent: true })
+    .addTo(capaComparacion);
+
+  if (puntosComparar.length === 2) {
+    const [a, b] = puntosComparar;
+    const d = distancia(a.lat, a.lon, b.lat, b.lon);
+
+    L.polyline([[a.lat, a.lon], [b.lat, b.lon]], {
+      color: "red",
+      weight: 3,
+      dashArray: "5,5"
+    })
+      .bindPopup(`📏 Distancia: <b>${d.toFixed(1)} m</b>`)
+      .addTo(capaComparacion);
+
+    puntosComparar = [];
+  }
+}
 // --- FUNCION GENERAL PARA BUSCAR CERCANOS ---
 function obtenerCercanos(lat, lon, max = 5) {
   const limite = parseFloat(document.getElementById("radioInput").value) || 20;
@@ -659,6 +732,15 @@ if (!btnDetalle) {
     marker = L.marker([encontrado.lat, encontrado.lon],{title:"SED "+encontrado.sed}).addTo(map);
     marker.bindTooltip(`SED: ${encontrado.sed}<br>UT: ${encontrado.ut}`).openTooltip();
     map.setView([encontrado.lat, encontrado.lon], 17);
+marker.on("click", () => {
+  registrarComparacion(
+    encontrado.lat,
+    encontrado.lon,
+    "SED",
+    encontrado.sed
+  );
+});
+
 
     // mostrar cercanos a la SED
     const cercanos = obtenerCercanos(encontrado.lat, encontrado.lon);
