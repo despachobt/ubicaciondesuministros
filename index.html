@@ -6,10 +6,7 @@
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
 <style>
-	#panelAtenciones.hidden {
-  	display: none !important;
-	}
-  body { margin: 0; height: 100vh; display: flex; overflow: hidden; }
+ body { margin: 0; height: 100vh; display: flex; overflow: hidden; }
   #sidebar { width: 320px; background: #f8f9fa; padding: 15px; overflow-y: auto; transition: all 0.3s ease; }
   #sidebar.hidden { transform: translateX(-100%); }
   #map { flex: 1; }
@@ -65,6 +62,25 @@ input[type=range] {
   filter: drop-shadow(0 0 4px orange);
   cursor: pointer;
 }
+/* Panel flotante herramientas */
+#panelHerramientas {
+  position: absolute;
+  right: 0;
+  bottom: 120px;
+  width: 300px;
+  background: #ffffff;
+  border-left: 2px solid #ddd;
+  padding: 15px;
+  z-index: 1500;
+
+  transform: translateX(100%);
+  transition: transform 0.4s ease-in-out;
+}
+
+#panelHerramientas.visible {
+  transform: translateX(0);
+}
+
 </style>
 </head>
 <body>
@@ -110,21 +126,6 @@ input[type=range] {
 <input type="range" id="radioInput"
        class="form-range"
        min="5" max="200" step="5" value="20">
-  </div>
-
-  <div class="mb-3">
-  <button id="btnSAP" class="btn btn-warning btn-sm w-100 mb-2">
-    🧾 Mostrar SAP
-  </button>
-
-  <button id="btnSED" class="btn btn-primary btn-sm w-100 mb-2">
-  📡 Mostrar SEDs
-</button>
-
-<button id="btnComparar" class="btn btn-danger btn-sm w-100">
-  📏 Comparar distancia
-</button>
-
 </div>
 <!-- 🔹 BLOQUE SUMINISTRO -->
   <div id="bloqueSuministro">
@@ -173,6 +174,27 @@ input[type=range] {
         style="position:absolute; bottom:20px; right:20px; z-index:1600;">
   📋 Atenciones
 </button>
+<button class="btn btn-primary" id="toggleHerramientasBtn"
+        style="position:absolute; bottom:70px; right:20px; z-index:1600;">
+  🛠️ Herramientas
+</button>
+<div id="panelHerramientas">
+  <h5>🛠️ Herramientas del mapa</h5>
+
+  <button id="btnSAP" class="btn btn-warning btn-sm w-100 mb-2">
+    🧾 Mostrar SAP
+  </button>
+
+  <button id="btnSED" class="btn btn-primary btn-sm w-100 mb-2">
+    📡 Mostrar SEDs
+  </button>
+<button id="btnContratistas" class="btn btn-dark btn-sm w-100 mb-2">
+    🗺️ Zonas contratistas
+  </button>
+  <button id="btnComparar" class="btn btn-danger btn-sm w-100">
+    📏 Comparar distancia
+  </button>
+</div>
 <div id="panelAtenciones">
   <h5>📋 Atenciones del suministro</h5>
 <button class="btn btn-success btn-sm mb-3 w-100"
@@ -195,6 +217,8 @@ let capaComparacion = L.layerGroup();
 let ultimoEncontro = null, ultimaSED = null, map, marker;
 let sedLayer = L.layerGroup();
 let sedVisible = false;
+let capaContratistas = L.layerGroup();
+let contratistasVisible = false;
 let cargados = 0, datosListos = false;
 let clienteActualAtenciones = null;
 
@@ -225,15 +249,26 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 // ============================
 // 🔶 BOTÓN MOSTRAR / OCULTAR SAP
 // ============================
-document.getElementById("btnSAP").addEventListener("click", () => {
-  const btn = document.getElementById("btnSAP");
+const btnSAP = document.getElementById("btnSAP");
+const btnContratistas = document.getElementById("btnContratistas");
 
+btnContratistas.addEventListener("click", () => {
+  if (!contratistasVisible) {
+    map.addLayer(capaContratistas);
+    btnContratistas.textContent = "❌ Ocultar contratistas";
+  } else {
+    map.removeLayer(capaContratistas);
+    btnContratistas.textContent = "🗺️ Zonas contratistas";
+  }
+  contratistasVisible = !contratistasVisible;
+});
+btnSAP.addEventListener("click", () => {
   if (!sapVisible) {
     map.addLayer(capaSAP);
-    btn.textContent = "❌ Ocultar SAP";
+    btnSAP.textContent = "❌ Ocultar SAP";
   } else {
     map.removeLayer(capaSAP);
-    btn.textContent = "🧾 Mostrar SAP";
+    btnSAP.textContent = "🧾 Mostrar SAP";
   }
 
   sapVisible = !sapVisible;
@@ -284,7 +319,66 @@ const urls = [
   {nombre:"COLONIAL",url:"https://dl.dropboxusercontent.com/scl/fi/mo1wrl48ky5v74l3ybfpd/COLONIAL.csv?rlkey=jhcfg302k4re8lnp5aya8o02n"},
   {nombre:"PANAMERICANA",url:"https://dl.dropboxusercontent.com/scl/fi/qpt0c6dqyhututunxgby5/PANAMERICANA.csv?rlkey=gtkcg709xhcohqdu70v8fzo16"}
 ];
+// ============================
+// ============================
+// 🎨 COLORES POR CONTRATISTA
+// ============================
+const coloresContratistas = {
+  "DOMINION": "#8e44ad",
+  "COBRA": "#5D4037",
+  "LARI": "#27ae60",
+  "PA": "#f39c12",
+  "INMEL": "#c0392b"
+};
 
+// ============================
+// 🧩 RELACIÓN ZONA → CONTRATISTA
+// ============================
+const zonaAContratista = {
+  // PA
+  "BARRIOS ALTOS": "PA",
+  "SAN ISIDRO": "PA",
+  "CHACRA RIOS": "PA",
+  "JESUS MARIA": "PA",
+  "SAN MIGUEL": "PA",
+  "CARCAMO": "PA",
+  "CENTRO HISTORICO": "PA",
+  "PUEBLO LIBRE": "PA",
+
+  // DOMINION
+  "SMP NORTE": "DOMINION",
+  "MORALES DUAREZ SUR": "DOMINION",
+  "GAMBETA": "DOMINION",
+  "CALLAO": "DOMINION",
+  "SMP CENTRO": "DOMINION",
+  "SARITA COLONIA": "DOMINION",
+  "BELLAVISTA-LA PERLA": "DOMINION",
+  "SMP SUR": "DOMINION",
+  "VENTANILLA": "DOMINION",
+  "SAN JOSE": "DOMINION",
+
+  // LARI
+  "RIMAC": "LARI",
+  "EL AGUSTINO": "LARI",
+  "SJL NORTE": "LARI",
+  "JICAMARCA": "LARI",
+  "LOS OLIVOS": "LARI",
+  "INDEPENDENCIA": "LARI",
+  "SJL SUR": "LARI",
+
+  // COBRA
+  "COMAS COLLIQUE": "COBRA",
+  "COMAS EL PINAR": "COBRA",
+  "PUENTE PIEDRA SUR": "COBRA",
+  "COMAS SUR": "COBRA",
+  "PUENTE PIEDRA NORTE": "COBRA",
+  "PUENTE PIEDRA CENTRO": "COBRA",
+  "CANTA CARABAYLLO": "COBRA",
+  "CARABAYLLO": "COBRA",
+  "COMAS CENTRO": "COBRA",
+  "ANCON": "COBRA",
+  "PACHACUTEC": "COBRA"
+};
 function actualizarProgreso() {
   cargados++;
   const bar = document.getElementById("progress-bar");
@@ -295,8 +389,6 @@ function actualizarProgreso() {
 
   if (cargados === urls.length) {
     datosListos = true;
-    crearCapaSAP(); // 🔶 SAP cuando ya hay coordenadas
-
     bar.classList.remove("progress-bar-animated");
 
     const li = document.createElement("li");
@@ -376,6 +468,40 @@ sedLayer.addLayer(labelMarker);
       }
     });
   });
+// ============================
+// 🗺️ CARGAR MAPA CONTRATISTAS
+// ============================
+fetch("https://dl.dropboxusercontent.com/scl/fi/l4ib13fyeabtzg3oold5j/MAPA-CONTRATISTAS.json?rlkey=trbh0ditzueo83k42fm1w27ug")
+  .then(r => r.json())
+  .then(geojson => {
+
+  const layer = L.geoJSON(geojson, {
+    style: feature => {
+      const zona = feature.properties.name?.toUpperCase() || "";
+      const contratista = zonaAContratista[zona] || "SIN ASIGNAR";
+
+      return {
+        color: coloresContratistas[contratista] || "#7f8c8d",
+        weight: 2,
+        fillOpacity: 0.25
+      };
+    },
+
+    onEachFeature: (feature, layer) => {
+      const zona = feature.properties.name || "—";
+      const contratista = zonaAContratista[zona.toUpperCase()] || "SIN ASIGNAR";
+
+      layer.bindTooltip(
+        `<b>Zona:</b> ${zona}<br><b>Contratista:</b> ${contratista}`,
+        { sticky: true }
+      );
+    }
+  });
+
+  capaContratistas.addLayer(layer);
+  console.log("✅ Zonas de contratistas cargadas correctamente");
+
+})
 
 // --- CARGAR ATENCIONES DE 2024 Y 2025 ---
 const urlsAtenciones = [
@@ -454,28 +580,28 @@ Promise.all([
 fetch("https://docs.google.com/spreadsheets/d/1O00gmsXQH1_Q_wf1s7Cb5trM1HESBAT7NlaD9XnHaOA/gviz/tq?tqx=out:csv&sheet=SAP")
   .then(r => r.text())
   .then(texto => {
-    const lineas = texto.trim().split(/\r?\n/);
+  const lineas = texto.trim().split(/\r?\n/);
 
-    console.log("📄 Filas CSV SAP:", lineas.length);
+  lineas.slice(1).forEach(l => {
+    const cols = l.split(",");
 
-    lineas.slice(1).forEach(l => {
-      const cols = l.split(","); // ✅ NO REEMPLAZAR
+    const sap = cols[0]?.replace(/"/g,"").trim();        // A
+    const fechaRegistro = cols[1]?.replace(/"/g,"").trim(); // B
+    const motivo = cols[4]?.replace(/"/g,"").trim();    // E
+    const estado = cols[5]?.replace(/"/g,"").trim();    // F
+    const cliente = cols[8]?.replace(/"/g,"").trim().replace(/^0+/,""); // I
+    const fechaAtencion = cols[45]?.replace(/"/g,"").trim(); // AT
 
-      if (cols.length < 2) return;
-
-      const cliente = cols[0]
-        .replace(/"/g, "")
-        .trim()
-        .replace(/^0+/, "");
-
-      const sap = cols[1]
-        .replace(/"/g, "")
-        .trim();
-
-      if (cliente && sap) {
-        mapaSAP[cliente] = sap;
-      }
-    });
+    if (cliente && sap) {
+      mapaSAP[cliente] = {
+        sap,
+        motivo,
+        estado,
+        fechaRegistro,
+        fechaAtencion
+      };
+    }
+  });
 
     console.log("✅ SAP cargados:", Object.keys(mapaSAP).length);
 
@@ -499,18 +625,20 @@ function crearCapaSAP() {
   capaSAP.clearLayers();
 
   datos.forEach(d => {
-    const sap = mapaSAP[d.cliente];
-    if (!sap) return;
+    const info = mapaSAP[d.cliente];
+    if (!info) return;
 
     const popupSAP = `
-      <b>🧾 SAP</b><br>
-      <span style="font-size:14px;"><b>${sap}</b></span><br>
-      <button class="btn btn-sm btn-warning mt-1"
-              onclick="copiarSAP('${sap}')">
+      <b>💡 SAP ${info.sap}</b><br>
+      🧾 <b>Motivo:</b> ${info.motivo || "—"}<br>
+      📌 <b>Estado:</b> ${info.estado || "—"}<br>
+      📅 <b>Registro:</b> ${info.fechaRegistro || "—"}<br>
+      🛠️ <b>Atención:</b> ${info.fechaAtencion || "—"}<br>
+      <button class="btn btn-sm btn-warning mt-2"
+        onclick="copiarSAP('${info.sap}')">
         📋 Copiar SAP
       </button>
     `;
-
     const marker = L.marker([d.lat, d.lon], {
       icon: iconoSAP
     }).bindPopup(popupSAP);
@@ -518,13 +646,12 @@ function crearCapaSAP() {
     capaSAP.addLayer(marker);
   });
 }
-
 // --- FUNCIONES ---
 function mostrarAtenciones(clienteID){
   const lista=document.getElementById("listaAtenciones");
   const panel=document.getElementById("panelAtenciones");
   lista.innerHTML="";
-  panel.style.display="block";
+  panel.classList.add("visible");
 
   const idLimpio = clienteID.trim().replace(/"/g,"");
 
@@ -830,6 +957,23 @@ function buscarPorCoordenadas() {
   resultadoCoord.textContent = "❌ Coordenadas inválidas";
 }
 // --- TOGGLE PANEL ATENCIONES ---
+// --- TOGGLE PANEL HERRAMIENTAS ---
+const btnHerramientas = document.getElementById("toggleHerramientasBtn");
+const panelHerramientas = document.getElementById("panelHerramientas");
+
+btnHerramientas.addEventListener("click", () => {
+  panelHerramientas.classList.toggle("visible");
+
+  if (panelHerramientas.classList.contains("visible")) {
+    btnHerramientas.textContent = "❌ Cerrar";
+    btnHerramientas.classList.remove("btn-primary");
+    btnHerramientas.classList.add("btn-danger");
+  } else {
+    btnHerramientas.textContent = "🛠️ Herramientas";
+    btnHerramientas.classList.remove("btn-danger");
+    btnHerramientas.classList.add("btn-primary");
+  }
+});
 const btnAtenciones = document.getElementById("toggleAtencionesBtn");
 const panelAtenciones = document.getElementById("panelAtenciones");
 
@@ -951,6 +1095,31 @@ function copiarSAP(sap) {
   navigator.clipboard.writeText(sap).then(() => {
     alert("✅ SAP copiado: " + sap);
   });
+}
+function filtrarSAP() {
+  const desde = document.getElementById("sapDesde").value;
+  const hasta = document.getElementById("sapHasta").value;
+
+  capaSAP.clearLayers();
+
+  datos.forEach(d => {
+    const info = mapaSAP[d.cliente];
+    if (!info) return;
+
+    if (desde && info.fechaRegistro < desde) return;
+    if (hasta && info.fechaRegistro > hasta) return;
+
+    const marker = L.marker([d.lat, d.lon], { icon: iconoSAP })
+      .bindPopup(`💡 SAP ${info.sap}`);
+
+    capaSAP.addLayer(marker);
+  });
+
+  if (!sapVisible) {
+    map.addLayer(capaSAP);
+    sapVisible = true;
+    btnSAP.textContent = "❌ Ocultar SAP";
+  }
 }
 </script>
 <!-- MODAL DETALLE SED -->
