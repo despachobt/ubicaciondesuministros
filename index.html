@@ -208,6 +208,8 @@ input[type=range] {
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script>
 let datos = [], sedDatos = [], historial = [], cercanosMarkers = [], atenciones = [];
+const RADIO_VISUAL_SAP = 1000; // metros
+const RADIO_VISUAL_SED = 1000; // metros
 // ============================
 // 📏 COMPARAR DISTANCIAS
 // ============================
@@ -296,8 +298,51 @@ document.getElementById("btnSED").addEventListener("click", () => {
   const btn = document.getElementById("btnSED");
 
   if (!sedVisible) {
+    sedLayer.clearLayers();
+
+    if (!ultimoEncontro && !ultimaSED) {
+      alert("⚠️ Primero busca un suministro o una SED");
+      return;
+    }
+
+    const ref = ultimoEncontro || ultimaSED;
+    const latRef = ref.lat;
+    const lonRef = ref.lon;
+
+    sedDatos.forEach(obj => {
+      const dMetros = distancia(latRef, lonRef, obj.lat, obj.lon);
+      if (dMetros > RADIO_VISUAL_SED) return;
+
+      // 🔹 Rectángulo SED
+      const rect = L.rectangle(
+        [
+          [obj.lat - 0.00005, obj.lon - 0.00005],
+          [obj.lat + 0.00005, obj.lon + 0.00005]
+        ],
+        { color: "blue", weight: 1, fillOpacity: 0.6 }
+      ).bindTooltip(`SED: ${obj.sed}<br>ALIM: ${obj.alim}`);
+
+      sedLayer.addLayer(rect);
+
+      // 🔹 Etiqueta con nombre de SED
+      const labelIcon = L.divIcon({
+        className: "sed-label",
+        html: `<div>${obj.sed}</div>`,
+        iconSize: [90, 20],
+        iconAnchor: [45, -12]
+      });
+
+      const labelMarker = L.marker([obj.lat, obj.lon], {
+        icon: labelIcon,
+        interactive: false
+      });
+
+      sedLayer.addLayer(labelMarker);
+    });
+
     map.addLayer(sedLayer);
     btn.textContent = "❌ Ocultar SEDs";
+
   } else {
     map.removeLayer(sedLayer);
     btn.textContent = "📡 Mostrar SEDs";
@@ -305,6 +350,7 @@ document.getElementById("btnSED").addEventListener("click", () => {
 
   sedVisible = !sedVisible;
 });
+
 
 const usuarios = [{user:"despachobt", pass:"Pluz2025"}];
 function login(){
@@ -623,25 +669,31 @@ const estiloSAP = {
 
 function crearCapaSAP() {
   capaSAP.clearLayers();
+  if (!ultimoEncontro && !ultimaSED) return;
+
+  const ref = ultimoEncontro || ultimaSED;
+  const latRef = ref.lat;
+  const lonRef = ref.lon;
 
   datos.forEach(d => {
     const info = mapaSAP[d.cliente];
     if (!info) return;
 
+    const dMetros = distancia(latRef, lonRef, d.lat, d.lon);
+    if (dMetros > RADIO_VISUAL_SAP) return;
+
     const popupSAP = `
       <b>💡 SAP ${info.sap}</b><br>
-      🧾 <b>Motivo:</b> ${info.motivo || "—"}<br>
-      📌 <b>Estado:</b> ${info.estado || "—"}<br>
-      📅 <b>Registro:</b> ${info.fechaRegistro || "—"}<br>
-      🛠️ <b>Atención:</b> ${info.fechaAtencion || "—"}<br>
+      🧾 ${info.motivo || "—"}<br>
+      📌 ${info.estado || "—"}<br>
       <button class="btn btn-sm btn-warning mt-2"
         onclick="copiarSAP('${info.sap}')">
         📋 Copiar SAP
       </button>
     `;
-    const marker = L.marker([d.lat, d.lon], {
-      icon: iconoSAP
-    }).bindPopup(popupSAP);
+
+    const marker = L.marker([d.lat, d.lon], { icon: iconoSAP })
+      .bindPopup(popupSAP);
 
     capaSAP.addLayer(marker);
   });
