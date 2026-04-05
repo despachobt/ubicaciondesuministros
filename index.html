@@ -814,19 +814,21 @@ function formatearFechaTecnico(ts) {
 }
 
 function obtenerEstadoTecnico(timestamp, activo) {
-  if (!activo) return "Detenido";
+  if (activo === false) return "Detenido";
   if (!timestamp) return "Sin señal";
 
   const diff = Date.now() - timestamp;
+  const cincoMin = 5 * 60 * 1000;
 
-  if (diff <= 120000) return "Activo";
-  if (diff <= 300000) return "Demorado";
-  return "Sin señal";
+  if (diff > cincoMin) return "Sin señal";
+
+  return "Activo";
 }
 
 function colorEstadoTecnico(estado) {
-  if (estado === "Activo") return "#16a34a";
-  if (estado === "Demorado") return "#f59e0b";
+  if (estado === "Activo") return "#16a34a";     // verde
+  if (estado === "Sin señal") return "#f59e0b";  // naranja
+  if (estado === "Detenido") return "#6b7280";   // gris
   return "#6b7280";
 }
 
@@ -837,17 +839,21 @@ function crearIconoTecnico(estado) {
     className: "tecnico-icon",
     html: `
       <div style="
-        width:18px;
-        height:18px;
+        display:flex;
+        justify-content:center;
+        align-items:center;
+        width:40px;
+        height:40px;
         border-radius:50%;
-        background:${color};
-        border:2px solid white;
-        box-shadow:0 0 6px rgba(0,0,0,0.45);
-      "></div>
+        background:white;
+        border:3px solid ${color};
+        box-shadow:0 0 8px rgba(0,0,0,0.35);
+        font-size:20px;
+      ">👷</div>
     `,
-    iconSize: [18, 18],
-    iconAnchor: [9, 9],
-    popupAnchor: [0, -10]
+    iconSize: [40, 40],
+    iconAnchor: [20, 20],
+    popupAnchor: [0, -18]
   });
 }
 
