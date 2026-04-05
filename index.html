@@ -832,8 +832,17 @@ function colorEstadoTecnico(estado) {
   return "#6b7280";
 }
 
-function crearIconoTecnico(estado) {
+function crearIconoTecnico(tecnico, estado) {
   const color = colorEstadoTecnico(estado);
+
+  const nombreBase = (tecnico.nombre || tecnico.usuario || "").toUpperCase();
+
+  let emoji = "👷"; // por defecto
+  if (nombreBase.startsWith("REP_")) {
+    emoji = "🚚";
+  } else if (nombreBase.startsWith("REC_")) {
+    emoji = "👷";
+  }
 
   return L.divIcon({
     className: "tecnico-icon",
@@ -849,7 +858,7 @@ function crearIconoTecnico(estado) {
         border:3px solid ${color};
         box-shadow:0 0 8px rgba(0,0,0,0.35);
         font-size:20px;
-      ">👷</div>
+      ">${emoji}</div>
     `,
     iconSize: [40, 40],
     iconAnchor: [20, 20],
@@ -1293,11 +1302,11 @@ function escucharTecnicosTiempoReal() {
 
       if (markersTecnicos[id]) {
         markersTecnicos[id].setLatLng([tecnico.lat, tecnico.lon]);
-        markersTecnicos[id].setIcon(crearIconoTecnico(estado));
+        markersTecnicos[id].setIcon(crearIconoTecnico(tecnico, estado));
         markersTecnicos[id].setPopupContent(popup);
       } else {
         const markerTecnico = L.marker([tecnico.lat, tecnico.lon], {
-          icon: crearIconoTecnico(estado),
+          icon: crearIconoTecnico(tecnico, estado),
           title: tecnico.nombre || id
         }).bindPopup(popup);
 
