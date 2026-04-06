@@ -187,6 +187,36 @@ input[type=range] {
 <div id="panelHerramientas">
   <h5>🛠️ Herramientas del mapa</h5>
 
+  <div class="card mb-3">
+    <div class="card-body p-2">
+      <h6 class="mb-2">👷 Técnicos conectados</h6>
+
+      <input type="text" id="buscarTecnicoInput" class="form-control form-control-sm mb-2"
+             placeholder="Buscar por nombre o usuario">
+
+      <select id="filtroEstadoTecnico" class="form-select form-select-sm mb-2">
+        <option value="todos">Todos los estados</option>
+        <option value="Activo">Activos</option>
+        <option value="Sin señal">Sin señal</option>
+        <option value="Detenido">Detenidos</option>
+      </select>
+
+      <select id="filtroContratistaTecnico" class="form-select form-select-sm mb-2">
+        <option value="todos">Todas las contratistas</option>
+        <option value="LARI">LARI</option>
+        <option value="COBRA">COBRA</option>
+        <option value="DOMINION">DOMINION</option>
+        <option value="PA">PA</option>
+        <option value="INMEL">INMEL</option>
+      </select>
+
+      <div id="contadorTecnicos" class="small text-muted mb-2">0 técnicos</div>
+
+      <div id="listaTecnicosFiltrados" class="list-group small"
+           style="max-height:220px; overflow-y:auto;"></div>
+    </div>
+  </div>
+
   <button id="btnSAP" class="btn btn-warning btn-sm w-100 mb-2">
     🧾 Mostrar SAP
   </button>
@@ -240,6 +270,7 @@ let clienteActualAtenciones = null;
 let capaTecnicos = L.layerGroup();
 let tecnicosVisible = false;
 let markersTecnicos = {};
+let tecnicosData = {};
 
 // ============================
 // 🔶 CAPA SAP (OCULTA)
@@ -383,19 +414,39 @@ document.getElementById("btnSED").addEventListener("click", () => {
 });
 
 
-const usuarios = [{user:"despachobt", pass:"Pluz2025"}];
-function login(){
-  const u=user.value.trim(), p=pass.value.trim();
-  const ok=usuarios.find(x=>x.user===u&&x.pass===p);
-  loginMsg.textContent = ok ? "" : "❌ Usuario o contraseña incorrectos";
-  if(ok) loginScreen.style.display="none";
-}
+const usuarios = [{ user: "despachobt", pass: "Pluz2025" }];
 
+function login() {
+  const u = document.getElementById("user").value.trim();
+  const p = document.getElementById("pass").value.trim();
+  const loginMsg = document.getElementById("loginMsg");
+  const loginScreen = document.getElementById("loginScreen");
+
+  const ok = usuarios.find(x => x.user === u && x.pass === p);
+
+  loginMsg.textContent = ok ? "" : "❌ Usuario o contraseña incorrectos";
+  if (ok) loginScreen.style.display = "none";
+}
 const urls = [
   {nombre:"NORTE CHICO",url:"https://dl.dropboxusercontent.com/scl/fi/gq78aaeeowpllmk6aq6u8/NORTE-CHICO.csv?rlkey=amoh5m764nbkoobv8tggbbmhb"},
   {nombre:"COLONIAL",url:"https://dl.dropboxusercontent.com/scl/fi/mo1wrl48ky5v74l3ybfpd/COLONIAL.csv?rlkey=jhcfg302k4re8lnp5aya8o02n"},
   {nombre:"PANAMERICANA",url:"https://dl.dropboxusercontent.com/scl/fi/qpt0c6dqyhututunxgby5/PANAMERICANA.csv?rlkey=gtkcg709xhcohqdu70v8fzo16"}
 ];
+const sidebar = document.getElementById("sidebar");
+const progreso = document.getElementById("progreso");
+const progresoBox = document.getElementById("progresoBox");
+
+const searchBox = document.getElementById("searchBox");
+const resultado = document.getElementById("resultado");
+const verEnGoogle = document.getElementById("verEnGoogle");
+
+const searchSED = document.getElementById("searchSED");
+const resultadoSED = document.getElementById("resultadoSED");
+const verEnGoogleSED = document.getElementById("verEnGoogleSED");
+
+const coordInput = document.getElementById("coordInput");
+const resultadoCoord = document.getElementById("resultadoCoord");
+	
 // ============================
 // ============================
 // 🎨 COLORES POR CONTRATISTA
@@ -423,15 +474,12 @@ const zonaAContratista = {
   "PUEBLO LIBRE": "PA",
 
   // DOMINION
-  "SMP NORTE": "DOMINION",
   "MORALES DUAREZ SUR": "DOMINION",
   "GAMBETA": "DOMINION",
   "CALLAO": "DOMINION",
-  "SMP CENTRO": "DOMINION",
   "SARITA COLONIA": "DOMINION",
   "BELLAVISTA-LA PERLA": "DOMINION",
   "SMP SUR": "DOMINION",
-  "VENTANILLA": "DOMINION",
   "SAN JOSE": "DOMINION",
 
   // LARI
@@ -445,6 +493,9 @@ const zonaAContratista = {
 
   // COBRA
   "COMAS COLLIQUE": "COBRA",
+"VENTANILLA": "COBRA",
+"SMP NORTE": "COBRA",
+"SMP CENTRO": "COBRA",
   "COMAS EL PINAR": "COBRA",
   "PUENTE PIEDRA SUR": "COBRA",
   "COMAS SUR": "COBRA",
@@ -458,6 +509,7 @@ const zonaAContratista = {
 };
 function actualizarProgreso() {
   cargados++;
+console.log("cargados:", cargados, "de", urls.length);
   const bar = document.getElementById("progress-bar");
   const porcentaje = Math.round((cargados / urls.length) * 100);
 
@@ -498,12 +550,13 @@ urls.forEach(f=>{
     li.className="list-group-item";
     li.textContent=`${f.nombre}: ${lineas.length} filas cargadas`;
     progreso.appendChild(li);
-  }).catch(()=>{
-    const li=document.createElement("li");
-    li.className="list-group-item text-danger";
-    li.textContent="❌ Error al cargar "+f.nombre;
-    progreso.appendChild(li);
-  });
+  }).catch((err)=>{
+  console.error("Error cargando", f.nombre, err);
+  const li = document.createElement("li");
+  li.className = "list-group-item text-danger";
+  li.textContent = "❌ Error al cargar " + f.nombre;
+  progreso.appendChild(li);
+});
 });
 
 // Cargar SEDs (inicialmente ocultas)
@@ -870,6 +923,116 @@ function crearIconoTecnico(tecnico, estado) {
     iconAnchor: [20, 20],
     popupAnchor: [0, -18]
   });
+}
+
+function obtenerContratistaTecnico(tecnico) {
+  const base = (tecnico.id || tecnico.nombre || tecnico.usuario || "").toUpperCase();
+
+  if (base.includes("_LAR_")) return "LARI";
+  if (base.includes("_COB_")) return "COBRA";
+  if (base.includes("_DOM_")) return "DOMINION";
+  if (base.includes("_PA_")) return "PA";
+  if (base.includes("_INM_")) return "INMEL";
+
+  return "SIN ASIGNAR";
+}
+
+function refrescarListaTecnicos() {
+  const input = document.getElementById("buscarTecnicoInput");
+  const filtroEstado = document.getElementById("filtroEstadoTecnico");
+  const filtroContratista = document.getElementById("filtroContratistaTecnico");
+  const lista = document.getElementById("listaTecnicosFiltrados");
+  const contador = document.getElementById("contadorTecnicos");
+
+  if (!input || !filtroEstado || !filtroContratista || !lista || !contador) return;
+
+  const texto = input.value.trim().toLowerCase();
+  const estadoSeleccionado = filtroEstado.value;
+  const contratistaSeleccionada = filtroContratista.value;
+
+  lista.innerHTML = "";
+
+  const items = Object.entries(tecnicosData)
+  .filter(([id, tecnico]) => tecnico && typeof tecnico === "object")
+  .map(([id, tecnico]) => {
+    const estado = obtenerEstadoTecnico(tecnico.timestamp, tecnico.activo);
+    const contratista = obtenerContratistaTecnico(tecnico);
+    return { id, tecnico, estado, contratista };
+  })
+    .filter(({ tecnico, estado, contratista }) => {
+      	const nombre = (tecnico.nombre || "").toLowerCase();
+	const usuario = (tecnico.usuario || "").toLowerCase();
+	const idTecnico = (tecnico.id || "").toLowerCase();
+
+const cumpleTexto =
+  !texto ||
+  nombre.includes(texto) ||
+  usuario.includes(texto) ||
+  idTecnico.includes(texto);
+
+      const cumpleEstado =
+        estadoSeleccionado === "todos" || estado === estadoSeleccionado;
+
+      const cumpleContratista =
+        contratistaSeleccionada === "todos" || contratista === contratistaSeleccionada;
+
+      return cumpleTexto && cumpleEstado && cumpleContratista;
+    })
+    .sort((a, b) => (a.tecnico.nombre || a.id).localeCompare(b.tecnico.nombre || b.id));
+
+  contador.textContent = `${items.length} técnico(s)`;
+
+  if (items.length === 0) {
+    lista.innerHTML = `<div class="list-group-item text-muted">Sin resultados</div>`;
+    return;
+  }
+
+  items.forEach(({ id, tecnico, estado, contratista }) => {
+    const color = colorEstadoTecnico(estado);
+
+    const item = document.createElement("button");
+    item.type = "button";
+    item.className = "list-group-item list-group-item-action text-start";
+    item.innerHTML = `
+      <div><b>${tecnico.nombre || id}</b></div>
+      <div class="small text-muted">Usuario: ${tecnico.usuario || "-"}</div>
+      <div class="small">
+        <span style="color:${color}; font-weight:600;">${estado}</span> · ${contratista}
+      </div>
+    `;
+
+    item.onclick = () => {
+      if (tecnico.lat != null && tecnico.lon != null) {
+        map.setView([tecnico.lat, tecnico.lon], 18, { animate: true });
+
+        if (!tecnicosVisible) {
+          map.addLayer(capaTecnicos);
+          tecnicosVisible = true;
+          if (btnTecnicos) btnTecnicos.textContent = "❌ Ocultar técnicos";
+        }
+
+        if (markersTecnicos[id]) {
+          markersTecnicos[id].openPopup();
+        }
+      }
+    };
+
+    lista.appendChild(item);
+  });
+}
+
+const buscarTecnicoInput = document.getElementById("buscarTecnicoInput");
+const filtroEstadoTecnico = document.getElementById("filtroEstadoTecnico");
+const filtroContratistaTecnico = document.getElementById("filtroContratistaTecnico");
+
+if (buscarTecnicoInput) {
+  buscarTecnicoInput.addEventListener("input", refrescarListaTecnicos);
+}
+if (filtroEstadoTecnico) {
+  filtroEstadoTecnico.addEventListener("change", refrescarListaTecnicos);
+}
+if (filtroContratistaTecnico) {
+  filtroContratistaTecnico.addEventListener("change", refrescarListaTecnicos);
 }
 
 // 📏 DISTANCIA (metros)
@@ -1249,8 +1412,13 @@ function copiarSAP(sap) {
   });
 }
 function filtrarSAP() {
-  const desde = document.getElementById("sapDesde").value;
-  const hasta = document.getElementById("sapHasta").value;
+  const desdeInput = document.getElementById("sapDesde");
+  const hastaInput = document.getElementById("sapHasta");
+
+  if (!desdeInput || !hastaInput) return;
+
+  const desde = desdeInput.value;
+  const hasta = hastaInput.value;
 
   capaSAP.clearLayers();
 
@@ -1284,6 +1452,7 @@ function escucharTecnicosTiempoReal() {
 
   window.onValueFirebase(tecnicosRef, (snapshot) => {
     const data = snapshot.val() || {};
+	tecnicosData = data;
     const idsActuales = new Set(Object.keys(data));
 
     // Eliminar marcadores que ya no estén en la base
@@ -1295,33 +1464,36 @@ function escucharTecnicosTiempoReal() {
     });
 
     Object.entries(data).forEach(([id, tecnico]) => {
-      if (tecnico.lat == null || tecnico.lon == null) return;
+  if (!tecnico || typeof tecnico !== "object") return;
+  if (tecnico.lat == null || tecnico.lon == null) return;
 
-      const estado = obtenerEstadoTecnico(tecnico.timestamp, tecnico.activo);
+  const estado = obtenerEstadoTecnico(tecnico.timestamp, tecnico.activo);
 
-      const popup = `
-        <b>👷 ${tecnico.nombre || id}</b><br>
-        Usuario: ${tecnico.usuario || "-"}<br>
-        Estado: <b>${estado}</b><br>
-        Última actualización: ${formatearFechaTecnico(tecnico.timestamp)}
-      `;
+  const popup = `
+    <b>👷 ${tecnico.nombre || id}</b><br>
+    Usuario: ${tecnico.usuario || "-"}<br>
+    Estado: <b>${estado}</b><br>
+    Última actualización: ${formatearFechaTecnico(tecnico.timestamp)}
+  `;
 
-      if (markersTecnicos[id]) {
-        markersTecnicos[id].setLatLng([tecnico.lat, tecnico.lon]);
-        markersTecnicos[id].setIcon(crearIconoTecnico(tecnico, estado));
-        markersTecnicos[id].setPopupContent(popup);
-      } else {
-        const markerTecnico = L.marker([tecnico.lat, tecnico.lon], {
-          icon: crearIconoTecnico(tecnico, estado),
-          title: tecnico.nombre || id
-        }).bindPopup(popup);
+  if (markersTecnicos[id]) {
+    markersTecnicos[id].setLatLng([tecnico.lat, tecnico.lon]);
+    markersTecnicos[id].setIcon(crearIconoTecnico(tecnico, estado));
+    markersTecnicos[id].setPopupContent(popup);
+  } else {
+    const markerTecnico = L.marker([tecnico.lat, tecnico.lon], {
+      icon: crearIconoTecnico(tecnico, estado),
+      title: tecnico.nombre || id
+    }).bindPopup(popup);
 
-        markersTecnicos[id] = markerTecnico;
-        capaTecnicos.addLayer(markerTecnico);
-      }
-    });
+    markersTecnicos[id] = markerTecnico;
+    capaTecnicos.addLayer(markerTecnico);
+  }
+});
+	refrescarListaTecnicos();
   });
 }
+
 
 window.addEventListener("firebase-listo", () => {
   console.log("✅ Firebase listo");
