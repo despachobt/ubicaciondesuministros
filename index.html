@@ -224,8 +224,8 @@ input[type=range] {
   <button id="btnSED" class="btn btn-primary btn-sm w-100 mb-2">
     📡 Mostrar SEDs
   </button>
-<button id="btnContratistas" class="btn btn-dark btn-sm w-100 mb-2">
-    🗺️ Zonas contratistas
+  <button id="btnRespAlim" class="btn btn-info btn-sm w-100 mb-2">
+    ⚡ Responsabilidad por alimentador
   </button>
 
 <button id="btnTecnicos" class="btn btn-success btn-sm w-100 mb-2">
@@ -260,8 +260,8 @@ let capaComparacion = L.layerGroup();
 let ultimoEncontro = null, ultimaSED = null, map, marker;
 let sedLayer = L.layerGroup();
 let sedVisible = false;
-let capaContratistas = L.layerGroup();
-let contratistasVisible = false;
+let capaRespAlim = L.layerGroup();
+let respAlimVisible = false;
 let cargados = 0, datosListos = false;
 let clienteActualAtenciones = null;
 // ============================
@@ -300,18 +300,24 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 // 🔶 BOTÓN MOSTRAR / OCULTAR SAP
 // ============================
 const btnSAP = document.getElementById("btnSAP");
-const btnContratistas = document.getElementById("btnContratistas");
+const btnRespAlim = document.getElementById("btnRespAlim");
 const btnTecnicos = document.getElementById("btnTecnicos");
 
-btnContratistas.addEventListener("click", () => {
-  if (!contratistasVisible) {
-    map.addLayer(capaContratistas);
-    btnContratistas.textContent = "❌ Ocultar contratistas";
+btnRespAlim.addEventListener("click", () => {
+  if (!respAlimVisible) {
+    crearCapaResponsabilidadAlimentador();
+    if (capaRespAlim.getLayers().length === 0) {
+      alert("⚠️ Aún no hay datos de SED cargados para pintar responsabilidad por alimentador.");
+      return;
+    }
+    map.addLayer(capaRespAlim);
+    btnRespAlim.textContent = "❌ Ocultar responsabilidad";
   } else {
-    map.removeLayer(capaContratistas);
-    btnContratistas.textContent = "🗺️ Zonas contratistas";
+    map.removeLayer(capaRespAlim);
+    btnRespAlim.textContent = "⚡ Responsabilidad por alimentador";
   }
-  contratistasVisible = !contratistasVisible;
+
+  respAlimVisible = !respAlimVisible;
 });
 
 btnTecnicos.addEventListener("click", () => {
@@ -375,14 +381,17 @@ document.getElementById("btnSED").addEventListener("click", () => {
       const dMetros = distancia(latRef, lonRef, obj.lat, obj.lon);
       if (dMetros > RADIO_VISUAL_SED) return;
 
-      // 🔹 Rectángulo SED
+      const contratistaSED = nombreContratistaPorAlim(obj.alim, obj.sed);
+      const colorSED = colorPorContratista(contratistaSED);
+
+      // 🔹 Rectángulo SED pintado por contratista responsable
       const rect = L.rectangle(
         [
           [obj.lat - 0.00005, obj.lon - 0.00005],
           [obj.lat + 0.00005, obj.lon + 0.00005]
         ],
-        { color: "blue", weight: 1, fillOpacity: 0.6 }
-      ).bindTooltip(`SED: ${obj.sed}<br>ALIM: ${obj.alim}`);
+        { color: colorSED, weight: 2, fillOpacity: 0.65 }
+      ).bindTooltip(`SED: ${obj.sed}<br>ALIM: ${obj.alim}<br>Contratista: ${contratistaSED}`);
 
       sedLayer.addLayer(rect);
 
@@ -460,53 +469,590 @@ const coloresContratistas = {
 };
 
 // ============================
-// 🧩 RELACIÓN ZONA → CONTRATISTA
+// ⚡ RESPONSABILIDAD POR ALIMENTADOR
+// Fuente: hoja RESPONSABLE del Excel Zona de Responsabilidad
+// Se busca por prefijo: MA-16 -> MA- -> DOMINION, O-xx -> O- -> DOMINION, etc.
 // ============================
-const zonaAContratista = {
-  // PA
-  "BARRIOS ALTOS": "PA",
-  "SAN ISIDRO": "PA",
-  "CHACRA RIOS": "PA",
-  "JESUS MARIA": "PA",
-  "SAN MIGUEL": "PA",
-  "CARCAMO": "PA",
-  "CENTRO HISTORICO": "PA",
-  "PUEBLO LIBRE": "PA",
-
-  // DOMINION
-  "MORALES DUAREZ SUR": "DOMINION",
-  "GAMBETA": "DOMINION",
-  "CALLAO": "DOMINION",
-  "SARITA COLONIA": "DOMINION",
-  "BELLAVISTA-LA PERLA": "DOMINION",
-  "SMP SUR": "DOMINION",
-  "SAN JOSE": "DOMINION",
-
-  // LARI
-  "RIMAC": "LARI",
-  "EL AGUSTINO": "LARI",
-  "SJL NORTE": "LARI",
-  "JICAMARCA": "LARI",
-  "LOS OLIVOS": "LARI",
-  "INDEPENDENCIA": "LARI",
-  "SJL SUR": "LARI",
-
-  // COBRA
-  "COMAS COLLIQUE": "COBRA",
-"VENTANILLA": "COBRA",
-"SMP NORTE": "COBRA",
-"SMP CENTRO": "COBRA",
-  "COMAS EL PINAR": "COBRA",
-  "PUENTE PIEDRA SUR": "COBRA",
-  "COMAS SUR": "COBRA",
-  "PUENTE PIEDRA NORTE": "COBRA",
-  "PUENTE PIEDRA CENTRO": "COBRA",
-  "CANTA CARABAYLLO": "COBRA",
-  "CARABAYLLO": "COBRA",
-  "COMAS CENTRO": "COBRA",
-  "ANCON": "COBRA",
-  "PACHACUTEC": "COBRA"
+const responsabilidadPorPrefijoAlim = {
+  "N-": {
+    "alimentador": "ANCON",
+    "prefijo": "N-",
+    "contratista": "COBRA"
+  },
+  "AD-": {
+    "alimentador": "ANDAHUASI",
+    "prefijo": "AD-",
+    "contratista": "INMEL"
+  },
+  "AR-": {
+    "alimentador": "ARICA",
+    "prefijo": "AR-",
+    "contratista": "INMEL"
+  },
+  "AU-": {
+    "alimentador": "AUCALLAMA",
+    "prefijo": "AU-",
+    "contratista": "INMEL"
+  },
+  "BA-": {
+    "alimentador": "BARRANCA",
+    "prefijo": "BA-",
+    "contratista": "INMEL"
+  },
+  "K-": {
+    "alimentador": "BARSI",
+    "prefijo": "K-",
+    "contratista": "DOMINION"
+  },
+  "CT-": {
+    "alimentador": "CANTA",
+    "prefijo": "CT-",
+    "contratista": "COBRA"
+  },
+  "CG-": {
+    "alimentador": "CTO_GRANDE",
+    "prefijo": "CG-",
+    "contratista": "LARI"
+  },
+  "CV-": {
+    "alimentador": "CAUDIVILLA",
+    "prefijo": "CV-",
+    "contratista": "COBRA"
+  },
+  "CY-": {
+    "alimentador": "CHANCAY",
+    "prefijo": "CY-",
+    "contratista": "INMEL"
+  },
+  "CH-": {
+    "alimentador": "CHAVARRIA",
+    "prefijo": "CH-",
+    "contratista": "DOMINION"
+  },
+  "CN-": {
+    "alimentador": "CHILLON",
+    "prefijo": "CN-",
+    "contratista": "DOMINION"
+  },
+  "CS-": {
+    "alimentador": "COMAS",
+    "prefijo": "CS-",
+    "contratista": "COBRA"
+  },
+  "CU-": {
+    "alimentador": "CUSCO",
+    "prefijo": "CU-",
+    "contratista": "PA"
+  },
+  "FA-": {
+    "alimentador": "FILADELFIA",
+    "prefijo": "FA-",
+    "contratista": "DOMINION"
+  },
+  "AC-": {
+    "alimentador": "HOYOS ACOS",
+    "prefijo": "AC-",
+    "contratista": "INMEL"
+  },
+  "H-": {
+    "alimentador": "HUACHO / HUAURA",
+    "prefijo": "H-",
+    "contratista": "INMEL"
+  },
+  "HY-": {
+    "alimentador": "HUANDOY",
+    "prefijo": "HY-",
+    "contratista": "COBRA"
+  },
+  "HL-": {
+    "alimentador": "HUARAL",
+    "prefijo": "HL-",
+    "contratista": "INMEL"
+  },
+  "NZ-": {
+    "alimentador": "HUARANGAL",
+    "prefijo": "NZ-",
+    "contratista": "COBRA"
+  },
+  "ID-": {
+    "alimentador": "INDUSTRIAL",
+    "prefijo": "ID-",
+    "contratista": "DOMINION"
+  },
+  "I-": {
+    "alimentador": "INFANTAS",
+    "prefijo": "I-",
+    "contratista": "COBRA"
+  },
+  "IE-": {
+    "alimentador": "IZAGUIRRE",
+    "prefijo": "IE-",
+    "contratista": "LARI"
+  },
+  "J-": {
+    "alimentador": "JICAMARCA",
+    "prefijo": "J-",
+    "contratista": "LARI"
+  },
+  "JG-": {
+    "alimentador": "JOSE GRANDA",
+    "prefijo": "JG-",
+    "contratista": "LARI"
+  },
+  "MS-": {
+    "alimentador": "MALVINAS",
+    "prefijo": "MS-",
+    "contratista": "PA"
+  },
+  "MA-": {
+    "alimentador": "MARANGA",
+    "prefijo": "MA-",
+    "contratista": "DOMINION"
+  },
+  "MI-": {
+    "alimentador": "MARIATEGUI",
+    "prefijo": "MI-",
+    "contratista": "LARI"
+  },
+  "MM-": {
+    "alimentador": "MED.MUNDO",
+    "prefijo": "MM-",
+    "contratista": "INMEL"
+  },
+  "MR-": {
+    "alimentador": "MIRADOR",
+    "prefijo": "MR-",
+    "contratista": "LARI"
+  },
+  "M-": {
+    "alimentador": "MIRONES",
+    "prefijo": "M-",
+    "contratista": "PA"
+  },
+  "NJ-": {
+    "alimentador": "NARANJAL",
+    "prefijo": "NJ-",
+    "contratista": "LARI"
+  },
+  "NV-": {
+    "alimentador": "NAVA",
+    "prefijo": "NV-",
+    "contratista": "INMEL"
+  },
+  "O-": {
+    "alimentador": "OQUENDO",
+    "prefijo": "O-",
+    "contratista": "DOMINION"
+  },
+  "PA-": {
+    "alimentador": "PANDO",
+    "prefijo": "PA-",
+    "contratista": "PA"
+  },
+  "Q-": {
+    "alimentador": "PERSHING",
+    "prefijo": "Q-",
+    "contratista": "PA"
+  },
+  "PP-": {
+    "alimentador": "PT-PIEDRA",
+    "prefijo": "PP-",
+    "contratista": "COBRA"
+  },
+  "RP-": {
+    "alimentador": "RAVIRA",
+    "prefijo": "RP-",
+    "contratista": "INMEL"
+  },
+  "SL-": {
+    "alimentador": "SANTA LEONOR",
+    "prefijo": "SL-",
+    "contratista": "INMEL"
+  },
+  "F-": {
+    "alimentador": "STA-MARINA",
+    "prefijo": "F-",
+    "contratista": "DOMINION"
+  },
+  "P-": {
+    "alimentador": "STA.ROSA_A",
+    "prefijo": "P-",
+    "contratista": "LARI"
+  },
+  "SU-": {
+    "alimentador": "SUPE",
+    "prefijo": "SU-",
+    "contratista": "INMEL"
+  },
+  "T-": {
+    "alimentador": "TACNA",
+    "prefijo": "T-",
+    "contratista": "PA"
+  },
+  "TV-": {
+    "alimentador": "T-VALLE",
+    "prefijo": "TV-",
+    "contratista": "DOMINION"
+  },
+  "U-": {
+    "alimentador": "UNI",
+    "prefijo": "U-",
+    "contratista": "LARI"
+  },
+  "V-": {
+    "alimentador": "VENTANILLA",
+    "prefijo": "V-",
+    "contratista": "COBRA"
+  },
+  "W-": {
+    "alimentador": "ZAPALLAL",
+    "prefijo": "W-",
+    "contratista": "COBRA"
+  },
+  "Z-": {
+    "alimentador": "ZARATE",
+    "prefijo": "Z-",
+    "contratista": "LARI"
+  }
 };
+
+const responsabilidadPorNombreAlim = {
+  "ANCON": {
+    "alimentador": "ANCON",
+    "prefijo": "N-",
+    "contratista": "COBRA"
+  },
+  "ANDAHUASI": {
+    "alimentador": "ANDAHUASI",
+    "prefijo": "AD-",
+    "contratista": "INMEL"
+  },
+  "ARICA": {
+    "alimentador": "ARICA",
+    "prefijo": "AR-",
+    "contratista": "INMEL"
+  },
+  "AUCALLAMA": {
+    "alimentador": "AUCALLAMA",
+    "prefijo": "AU-",
+    "contratista": "INMEL"
+  },
+  "BARRANCA": {
+    "alimentador": "BARRANCA",
+    "prefijo": "BA-",
+    "contratista": "INMEL"
+  },
+  "BARSI": {
+    "alimentador": "BARSI",
+    "prefijo": "K-",
+    "contratista": "DOMINION"
+  },
+  "CANTA": {
+    "alimentador": "CANTA",
+    "prefijo": "CT-",
+    "contratista": "COBRA"
+  },
+  "CTO_GRANDE": {
+    "alimentador": "CTO_GRANDE",
+    "prefijo": "CG-",
+    "contratista": "LARI"
+  },
+  "CAUDIVILLA": {
+    "alimentador": "CAUDIVILLA",
+    "prefijo": "CV-",
+    "contratista": "COBRA"
+  },
+  "CHANCAY": {
+    "alimentador": "CHANCAY",
+    "prefijo": "CY-",
+    "contratista": "INMEL"
+  },
+  "CHAVARRIA": {
+    "alimentador": "CHAVARRIA",
+    "prefijo": "CH-",
+    "contratista": "DOMINION"
+  },
+  "CHILLON": {
+    "alimentador": "CHILLON",
+    "prefijo": "CN-",
+    "contratista": "DOMINION"
+  },
+  "COMAS": {
+    "alimentador": "COMAS",
+    "prefijo": "CS-",
+    "contratista": "COBRA"
+  },
+  "CUSCO": {
+    "alimentador": "CUSCO",
+    "prefijo": "CU-",
+    "contratista": "PA"
+  },
+  "FILADELFIA": {
+    "alimentador": "FILADELFIA",
+    "prefijo": "FA-",
+    "contratista": "DOMINION"
+  },
+  "HOYOS ACOS": {
+    "alimentador": "HOYOS ACOS",
+    "prefijo": "AC-",
+    "contratista": "INMEL"
+  },
+  "HUACHO": {
+    "alimentador": "HUACHO",
+    "prefijo": "H-",
+    "contratista": "INMEL"
+  },
+  "HUANDOY": {
+    "alimentador": "HUANDOY",
+    "prefijo": "HY-",
+    "contratista": "COBRA"
+  },
+  "HUARAL": {
+    "alimentador": "HUARAL",
+    "prefijo": "HL-",
+    "contratista": "INMEL"
+  },
+  "HUARANGAL": {
+    "alimentador": "HUARANGAL",
+    "prefijo": "NZ-",
+    "contratista": "COBRA"
+  },
+  "HUAURA": {
+    "alimentador": "HUAURA",
+    "prefijo": "H-",
+    "contratista": "INMEL"
+  },
+  "HUINCO 1": {
+    "alimentador": "HUINCO 1",
+    "prefijo": "",
+    "contratista": "DOMINION"
+  },
+  "HUINCO 2": {
+    "alimentador": "HUINCO 2",
+    "prefijo": "",
+    "contratista": "DOMINION"
+  },
+  "INDUSTRIAL": {
+    "alimentador": "INDUSTRIAL",
+    "prefijo": "ID-",
+    "contratista": "DOMINION"
+  },
+  "INFANTAS": {
+    "alimentador": "INFANTAS",
+    "prefijo": "I-",
+    "contratista": "COBRA"
+  },
+  "IZAGUIRRE": {
+    "alimentador": "IZAGUIRRE",
+    "prefijo": "IE-",
+    "contratista": "LARI"
+  },
+  "JICAMARCA": {
+    "alimentador": "JICAMARCA",
+    "prefijo": "J-",
+    "contratista": "LARI"
+  },
+  "JOSE GRANDA": {
+    "alimentador": "JOSE GRANDA",
+    "prefijo": "JG-",
+    "contratista": "LARI"
+  },
+  "MALVINAS": {
+    "alimentador": "MALVINAS",
+    "prefijo": "MS-",
+    "contratista": "PA"
+  },
+  "MARANGA": {
+    "alimentador": "MARANGA",
+    "prefijo": "MA-",
+    "contratista": "DOMINION"
+  },
+  "MARIATEGUI": {
+    "alimentador": "MARIATEGUI",
+    "prefijo": "MI-",
+    "contratista": "LARI"
+  },
+  "MED.MUNDO": {
+    "alimentador": "MED.MUNDO",
+    "prefijo": "MM-",
+    "contratista": "INMEL"
+  },
+  "MIRADOR": {
+    "alimentador": "MIRADOR",
+    "prefijo": "MR-",
+    "contratista": "LARI"
+  },
+  "MIRONES": {
+    "alimentador": "MIRONES",
+    "prefijo": "M-",
+    "contratista": "PA"
+  },
+  "NARANJAL": {
+    "alimentador": "NARANJAL",
+    "prefijo": "NJ-",
+    "contratista": "LARI"
+  },
+  "NAVA": {
+    "alimentador": "NAVA",
+    "prefijo": "NV-",
+    "contratista": "INMEL"
+  },
+  "OQUENDO": {
+    "alimentador": "OQUENDO",
+    "prefijo": "O-",
+    "contratista": "DOMINION"
+  },
+  "PANDO": {
+    "alimentador": "PANDO",
+    "prefijo": "PA-",
+    "contratista": "PA"
+  },
+  "PERSHING": {
+    "alimentador": "PERSHING",
+    "prefijo": "Q-",
+    "contratista": "PA"
+  },
+  "PT-PIEDRA": {
+    "alimentador": "PT-PIEDRA",
+    "prefijo": "PP-",
+    "contratista": "COBRA"
+  },
+  "RAVIRA": {
+    "alimentador": "RAVIRA",
+    "prefijo": "RP-",
+    "contratista": "INMEL"
+  },
+  "SANTA LEONOR": {
+    "alimentador": "SANTA LEONOR",
+    "prefijo": "SL-",
+    "contratista": "INMEL"
+  },
+  "STA-MARINA": {
+    "alimentador": "STA-MARINA",
+    "prefijo": "F-",
+    "contratista": "DOMINION"
+  },
+  "STA.ROSA_A": {
+    "alimentador": "STA.ROSA_A",
+    "prefijo": "P-",
+    "contratista": "LARI"
+  },
+  "SUPE": {
+    "alimentador": "SUPE",
+    "prefijo": "SU-",
+    "contratista": "INMEL"
+  },
+  "TACNA": {
+    "alimentador": "TACNA",
+    "prefijo": "T-",
+    "contratista": "PA"
+  },
+  "T-VALLE": {
+    "alimentador": "T-VALLE",
+    "prefijo": "TV-",
+    "contratista": "DOMINION"
+  },
+  "UNI": {
+    "alimentador": "UNI",
+    "prefijo": "U-",
+    "contratista": "LARI"
+  },
+  "VENTANILLA": {
+    "alimentador": "VENTANILLA",
+    "prefijo": "V-",
+    "contratista": "COBRA"
+  },
+  "ZAPALLAL": {
+    "alimentador": "ZAPALLAL",
+    "prefijo": "W-",
+    "contratista": "COBRA"
+  },
+  "ZARATE": {
+    "alimentador": "ZARATE",
+    "prefijo": "Z-",
+    "contratista": "LARI"
+  }
+};
+
+const prefijosResponsabilidadAlim = Object.keys(responsabilidadPorPrefijoAlim)
+  .sort((a, b) => b.length - a.length);
+
+function normalizarAlim(valor) {
+  return (valor || "")
+    .toString()
+    .trim()
+    .toUpperCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+function obtenerResponsabilidadAlim(alim, nombreSed = "") {
+  const texto = normalizarAlim(alim);
+
+  for (const prefijo of prefijosResponsabilidadAlim) {
+    if (texto.startsWith(prefijo)) {
+      return responsabilidadPorPrefijoAlim[prefijo];
+    }
+  }
+
+  const sed = normalizarAlim(nombreSed);
+  if (sed && responsabilidadPorNombreAlim[sed]) {
+    return responsabilidadPorNombreAlim[sed];
+  }
+
+  return null;
+}
+
+function colorPorContratista(contratista) {
+  return coloresContratistas[normalizarAlim(contratista)] || "#6c757d";
+}
+
+function nombreContratistaPorAlim(alim, nombreSed = "") {
+  const resp = obtenerResponsabilidadAlim(alim, nombreSed);
+  return resp ? resp.contratista : "SIN ASIGNAR";
+}
+
+function htmlResponsabilidadAlim(alim, nombreSed = "") {
+  const resp = obtenerResponsabilidadAlim(alim, nombreSed);
+
+  if (!resp) {
+    return `<span class="badge rounded-pill bg-secondary">SIN ASIGNAR</span>`;
+  }
+
+  const color = colorPorContratista(resp.contratista);
+  return `
+    <span class="badge rounded-pill" style="background:${color}; color:white;">👷 ${resp.contratista}</span>
+    <span class="small text-muted">${resp.alimentador || ""} ${resp.prefijo ? "(" + resp.prefijo + ")" : ""}</span>
+  `;
+}
+
+function crearCapaResponsabilidadAlimentador() {
+  capaRespAlim.clearLayers();
+
+  sedDatos.forEach(obj => {
+    if (!obj.lat || !obj.lon) return;
+
+    const resp = obtenerResponsabilidadAlim(obj.alim, obj.sed);
+    const contratista = resp ? resp.contratista : "SIN ASIGNAR";
+    const color = colorPorContratista(contratista);
+
+    const punto = L.circleMarker([obj.lat, obj.lon], {
+      radius: 7,
+      color,
+      fillColor: color,
+      weight: 2,
+      fillOpacity: 0.85
+    }).bindTooltip(
+      `<b>SED:</b> ${obj.sed}<br>` +
+      `<b>Alim:</b> ${obj.alim || "—"}<br>` +
+      `<b>Contratista:</b> ${contratista}`,
+      { sticky: true }
+    );
+
+    capaRespAlim.addLayer(punto);
+  });
+}
+
 function actualizarProgreso() {
   cargados++;
 console.log("cargados:", cargados, "de", urls.length);
@@ -578,10 +1124,12 @@ fetch("https://dl.dropboxusercontent.com/scl/fi/f27szlfjhlid5luse9j7y/SED.csv?rl
         };
         sedDatos.push(obj);
        // 🔹 Crear el rectángulo azul de la SED
+const contratistaSED = nombreContratistaPorAlim(obj.alim, obj.sed);
+const colorSED = colorPorContratista(contratistaSED);
 const mark = L.rectangle(
   [[obj.lat - 0.00005, obj.lon - 0.00005], [obj.lat + 0.00005, obj.lon + 0.00005]],
-  { color: "blue", weight: 1, fillOpacity: 0.6 }
-).bindTooltip(`SED: ${obj.sed}<br>ALIM: ${obj.alim}<br>UT: ${obj.ut}`);
+  { color: colorSED, weight: 2, fillOpacity: 0.65 }
+).bindTooltip(`SED: ${obj.sed}<br>ALIM: ${obj.alim}<br>UT: ${obj.ut}<br>Contratista: ${contratistaSED}`);
 sedLayer.addLayer(mark);
 mark.on("click", () => {
   registrarComparacion(obj.lat, obj.lon, "SED");
@@ -598,41 +1146,6 @@ sedLayer.addLayer(labelMarker);
       }
     });
   });
-// ============================
-// 🗺️ CARGAR MAPA CONTRATISTAS
-// ============================
-fetch("https://dl.dropboxusercontent.com/scl/fi/l4ib13fyeabtzg3oold5j/MAPA-CONTRATISTAS.json?rlkey=trbh0ditzueo83k42fm1w27ug")
-  .then(r => r.json())
-  .then(geojson => {
-
-  const layer = L.geoJSON(geojson, {
-    style: feature => {
-      const zona = feature.properties.name?.toUpperCase() || "";
-      const contratista = zonaAContratista[zona] || "SIN ASIGNAR";
-
-      return {
-        color: coloresContratistas[contratista] || "#7f8c8d",
-        weight: 2,
-        fillOpacity: 0.25
-      };
-    },
-
-    onEachFeature: (feature, layer) => {
-      const zona = feature.properties.name || "—";
-      const contratista = zonaAContratista[zona.toUpperCase()] || "SIN ASIGNAR";
-
-      layer.bindTooltip(
-        `<b>Zona:</b> ${zona}<br><b>Contratista:</b> ${contratista}`,
-        { sticky: true }
-      );
-    }
-  });
-
-  capaContratistas.addLayer(layer);
-  console.log("✅ Zonas de contratistas cargadas correctamente");
-
-})
-
 // --- CARGAR ATENCIONES DE 2024 Y 2025 ---
 const urlsAtenciones = [
   "https://dl.dropboxusercontent.com/scl/fi/wmk8o9eexfkatckqghzp9/ATENCIONDEF.csv?rlkey=9d3y1vv1laf4e5upznta16b3s", // 2025
@@ -766,10 +1279,13 @@ function crearCapaSAP() {
     const dMetros = distancia(latRef, lonRef, d.lat, d.lon);
     if (dMetros > RADIO_VISUAL_SAP) return;
 
+    const alimSAP = mapaClientes[d.cliente] || "No disponible";
     const popupSAP = `
       <b>💡 SAP ${info.sap}</b><br>
       🧾 ${info.motivo || "—"}<br>
       📌 ${info.estado || "—"}<br>
+      ⚡ ${alimSAP}<br>
+      👷 ${nombreContratistaPorAlim(alimSAP)}<br>
       <button class="btn btn-sm btn-warning mt-2"
         onclick="copiarSAP('${info.sap}')">
         📋 Copiar SAP
@@ -1106,7 +1622,8 @@ function buscarSuministro() {
   ultimoEncontro = encontrado;
   const alimCd = mapaClientes[encontrado.cliente] || "No disponible";
   resultado.innerHTML = `✅ Encontrado CLIENTE <b>${encontrado.cliente}</b><br>
-                         📡 <b>${alimCd}<br>
+                         📡 <b>${alimCd}</b><br>
+                         👷 ${htmlResponsabilidadAlim(alimCd)}<br>
                          🗂️ ${encontrado.ut}`;
 
     verEnGoogle.style.display = "inline";
@@ -1122,6 +1639,7 @@ function buscarSuministro() {
   li.innerHTML = `
     <b>${c.cliente}</b><br>
     📡 <span class="text-primary">${alimCdCercano}</span><br>
+    👷 ${htmlResponsabilidadAlim(alimCdCercano)}<br>
     📏 ${c.dist.toFixed(1)} m
   `;
   lista.appendChild(li);
@@ -1131,6 +1649,7 @@ function buscarSuministro() {
   m.bindTooltip(`
     Cliente: ${c.cliente}<br>
     ALIM CD: ${alimCdCercano}<br>
+    Contratista: ${nombreContratistaPorAlim(alimCdCercano)}<br>
     Distancia: ${c.dist.toFixed(1)}m
   `);
   cercanosMarkers.push(m);
@@ -1155,7 +1674,7 @@ function buscarSED() {
 
     // 🟡 Mostrar resultado con alimentador al costado
     const alimTexto = encontrado.alim ? ` (${encontrado.alim})` : "";
-    resultadoSED.innerHTML = `✅ Encontrado SED <b>${encontrado.sed}</b>${alimTexto}`;
+    resultadoSED.innerHTML = `✅ Encontrado SED <b>${encontrado.sed}</b>${alimTexto}<br>👷 ${htmlResponsabilidadAlim(encontrado.alim, encontrado.sed)}`;
     verEnGoogleSED.style.display = "inline";
 
 // --- Botón para ver detalle de SED ---
@@ -1172,7 +1691,7 @@ if (!btnDetalle) {
   btnDetalle.style.display = "inline";
 }
     marker = L.marker([encontrado.lat, encontrado.lon],{title:"SED "+encontrado.sed}).addTo(map);
-    marker.bindTooltip(`SED: ${encontrado.sed}<br>UT: ${encontrado.ut}`).openTooltip();
+    marker.bindTooltip(`SED: ${encontrado.sed}<br>ALIM: ${encontrado.alim}<br>Contratista: ${nombreContratistaPorAlim(encontrado.alim, encontrado.sed)}<br>UT: ${encontrado.ut}`).openTooltip();
     map.setView([encontrado.lat, encontrado.lon], 17);
 marker.on("click", () => {
   registrarComparacion(
@@ -1193,6 +1712,7 @@ marker.on("click", () => {
   li.innerHTML = `
     <b>${c.cliente}</b><br>
     📡 <span class="text-primary">${alimCdCercano}</span><br>
+    👷 ${htmlResponsabilidadAlim(alimCdCercano)}<br>
     📏 ${c.dist.toFixed(1)} m
   `;
   lista.appendChild(li);
@@ -1208,6 +1728,7 @@ marker.on("click", () => {
   m.bindTooltip(`
     <b>Cliente:</b> ${c.cliente}<br>
     <b>ALIM CD:</b> ${alimCdCercano}<br>
+    <b>Contratista:</b> ${nombreContratistaPorAlim(alimCdCercano)}<br>
     <b>Distancia:</b> ${c.dist.toFixed(1)}m
   `);
 
@@ -1246,6 +1767,7 @@ function buscarPorCoordenadas() {
   li.innerHTML = `
     <b>${c.cliente}</b><br>
     📡 <span class="text-primary">${alimCdCercano}</span><br>
+    👷 ${htmlResponsabilidadAlim(alimCdCercano)}<br>
     📏 ${c.dist.toFixed(1)} m
   `;
   lista.appendChild(li);
@@ -1261,6 +1783,7 @@ function buscarPorCoordenadas() {
   m.bindTooltip(`
     <b>Cliente:</b> ${c.cliente}<br>
     <b>ALIM CD:</b> ${alimCdCercano}<br>
+    <b>Contratista:</b> ${nombreContratistaPorAlim(alimCdCercano)}<br>
     <b>Distancia:</b> ${c.dist.toFixed(1)}m
   `);
 
