@@ -56,12 +56,6 @@
 input[type=range] {
   accent-color: #0d6efd; /* azul bootstrap */
 }
-/* 🔶 ICONO SAP */
-.sap-icon {
-  font-size: 34px;
-  filter: drop-shadow(0 0 4px orange);
-  cursor: pointer;
-}
 /* Panel flotante herramientas */
 #panelHerramientas {
   position: absolute;
@@ -217,9 +211,6 @@ input[type=range] {
     </div>
   </div>
 
-  <button id="btnSAP" class="btn btn-warning btn-sm w-100 mb-2">
-    🧾 Mostrar SAP
-  </button>
 
   <button id="btnSED" class="btn btn-primary btn-sm w-100 mb-2">
     📡 Mostrar SEDs
@@ -249,7 +240,16 @@ input[type=range] {
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script>
 let datos = [], sedDatos = [], historial = [], cercanosMarkers = [], atenciones = [];
-const RADIO_VISUAL_SAP = 1000; // metros
+const indiceClientes = new Map();       // cliente -> coordenadas/UT
+const indiceSED = new Map();            // SED -> datos SED
+const indiceAtenciones = new Map();     // cliente -> atenciones
+const indiceSedClientes = new Map();    // SED -> detalle de clientes por llave
+let atencionesListas = false;
+let cargandoAtencionesPromise = null;
+let sedClientesListas = false;
+let cargandoSedClientesPromise = null;
+let firebaseInicializado = false;
+let escuchandoTecnicos = false;
 const RADIO_VISUAL_SED = 1000; // metros
 // ============================
 // 📏 COMPARAR DISTANCIAS
@@ -272,34 +272,11 @@ let tecnicosVisible = false;
 let markersTecnicos = {};
 let tecnicosData = {};
 
-// ============================
-// 🔶 CAPA SAP (OCULTA)
-// ============================
-let mapaSAP = {};              // cliente -> SAP
-let capaSAP = L.layerGroup();  // capa Leaflet
-let sapVisible = false;
-
-// 🔶 ICONO SAP 
-const iconoSAP = L.divIcon({
-  className: "sap-icon",
-  html: "💡",
-  iconSize: [36, 36],
-  iconAnchor: [18, 18],
-  popupAnchor: [0, -18]
-});
-
 // Inicializa mapa
 map = L.map('map').setView([-11.95, -76.95], 8);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: 'Map data © OpenStreetMap contributors'
 }).addTo(map);
-// ============================
-// 🔶 BOTÓN MOSTRAR / OCULTAR SAP
-// ============================
-// ============================
-// 🔶 BOTÓN MOSTRAR / OCULTAR SAP
-// ============================
-const btnSAP = document.getElementById("btnSAP");
 const btnRespAlim = document.getElementById("btnRespAlim");
 const btnTecnicos = document.getElementById("btnTecnicos");
 
@@ -320,28 +297,27 @@ btnRespAlim.addEventListener("click", () => {
   respAlimVisible = !respAlimVisible;
 });
 
-btnTecnicos.addEventListener("click", () => {
+btnTecnicos.addEventListener("click", async () => {
   if (!tecnicosVisible) {
-    map.addLayer(capaTecnicos);
-    btnTecnicos.textContent = "❌ Ocultar técnicos";
+    try {
+      btnTecnicos.disabled = true;
+      btnTecnicos.textContent = "⏳ Cargando técnicos...";
+      await iniciarTecnicosSiNecesario();
+      map.addLayer(capaTecnicos);
+      btnTecnicos.textContent = "❌ Ocultar técnicos";
+      tecnicosVisible = true;
+    } catch (err) {
+      console.error("❌ Error al cargar técnicos:", err);
+      alert("No se pudo cargar la ubicación de técnicos. Revisa la conexión o Firebase.");
+      btnTecnicos.textContent = "👷 Mostrar técnicos";
+    } finally {
+      btnTecnicos.disabled = false;
+    }
   } else {
     map.removeLayer(capaTecnicos);
     btnTecnicos.textContent = "👷 Mostrar técnicos";
+    tecnicosVisible = false;
   }
-
-  tecnicosVisible = !tecnicosVisible;
-});
-
-btnSAP.addEventListener("click", () => {
-  if (!sapVisible) {
-    map.addLayer(capaSAP);
-    btnSAP.textContent = "❌ Ocultar SAP";
-  } else {
-    map.removeLayer(capaSAP);
-    btnSAP.textContent = "🧾 Mostrar SAP";
-  }
-
-  sapVisible = !sapVisible;
 });
 
 // ============================
@@ -1053,6 +1029,14 @@ function crearCapaResponsabilidadAlimentador() {
   });
 }
 
+function normalizarCliente(valor) {
+  return (valor || "")
+    .toString()
+    .trim()
+    .replace(/"/g, "")
+    .replace(/^0+/, "");
+}
+
 function actualizarProgreso() {
   cargados++;
 console.log("cargados:", cargados, "de", urls.length);
@@ -1068,7 +1052,7 @@ console.log("cargados:", cargados, "de", urls.length);
 
     const li = document.createElement("li");
     li.className = "list-group-item text-success";
-    li.textContent = "✅ Todos los archivos cargados con éxito.";
+    li.textContent = "✅ Suministros cargados. Atenciones, detalle SED y técnicos se cargan cuando los uses.";
     progreso.appendChild(li);
 
     setTimeout(() => {
@@ -1077,112 +1061,124 @@ console.log("cargados:", cargados, "de", urls.length);
   }
 }
 // Cargar suministros
-urls.forEach(f=>{
-  fetch(f.url).then(r=>r.text()).then(texto=>{
-    const lineas=texto.split("\n");
-    lineas.slice(1).forEach(l=>{
-      const cols=l.trim().split(";");
-      if(cols.length>=4){
-        datos.push({
-          cliente: cols[0].trim().replace(/^0+/, ""),
-          ut:cols[1].trim(),
-          lat:parseFloat(cols[2].replace(",", ".")),
-          lon:parseFloat(cols[3].replace(",", "."))
-        });
+urls.forEach(f => {
+  fetch(f.url).then(r => r.text()).then(texto => {
+    const lineas = texto.split("\n");
+    lineas.slice(1).forEach(l => {
+      const cols = l.trim().split(";");
+      if (cols.length >= 4) {
+        const obj = {
+          cliente: normalizarCliente(cols[0]),
+          ut: cols[1].trim(),
+          lat: parseFloat(cols[2].replace(",", ".")),
+          lon: parseFloat(cols[3].replace(",", "."))
+        };
+
+        if (!obj.cliente || isNaN(obj.lat) || isNaN(obj.lon)) return;
+
+        datos.push(obj);
+        indiceClientes.set(obj.cliente, obj);
       }
     });
+
     actualizarProgreso();
-    const li=document.createElement("li");
-    li.className="list-group-item";
-    li.textContent=`${f.nombre}: ${lineas.length} filas cargadas`;
+    const li = document.createElement("li");
+    li.className = "list-group-item";
+    li.textContent = `${f.nombre}: ${lineas.length} filas cargadas`;
     progreso.appendChild(li);
-  }).catch((err)=>{
-  console.error("Error cargando", f.nombre, err);
-  const li = document.createElement("li");
-  li.className = "list-group-item text-danger";
-  li.textContent = "❌ Error al cargar " + f.nombre;
-  progreso.appendChild(li);
-});
+  }).catch((err) => {
+    console.error("Error cargando", f.nombre, err);
+    const li = document.createElement("li");
+    li.className = "list-group-item text-danger";
+    li.textContent = "❌ Error al cargar " + f.nombre;
+    progreso.appendChild(li);
+  });
 });
 
-// Cargar SEDs (inicialmente ocultas)
+// Cargar SEDs: ahora solo se guardan en memoria.
+// Los rectángulos/etiquetas se dibujan recién al presionar "Mostrar SEDs".
 fetch("https://dl.dropboxusercontent.com/scl/fi/f27szlfjhlid5luse9j7y/SED.csv?rlkey=kmmfa1sawvl73b2wcdn2exrg4")
-  .then(r=>r.text())
-  .then(texto=>{
-    const lineas=texto.trim().split(/\r?\n/);
-    lineas.slice(1).forEach(l=>{
-      const cols=l.split(",");
-      if(cols.length>=7){
-        const obj={
-          sed:cols[0].trim().toUpperCase(),
-          alim:cols[1].trim(),
-          clientesBT:cols[2].trim(),
-          tipo:cols[3].trim(),
-          ut:cols[4].trim(),
-          lon:parseFloat(cols[5].replace(",", ".").trim()),
-          lat:parseFloat(cols[6].replace(",", ".").trim())
+  .then(r => r.text())
+  .then(texto => {
+    const lineas = texto.trim().split(/\r?\n/);
+    lineas.slice(1).forEach(l => {
+      const cols = l.split(",");
+      if (cols.length >= 7) {
+        const obj = {
+          sed: cols[0].trim().toUpperCase(),
+          alim: cols[1].trim(),
+          clientesBT: cols[2].trim(),
+          tipo: cols[3].trim(),
+          ut: cols[4].trim(),
+          lon: parseFloat(cols[5].replace(",", ".").trim()),
+          lat: parseFloat(cols[6].replace(",", ".").trim())
         };
+
+        if (!obj.sed || isNaN(obj.lat) || isNaN(obj.lon)) return;
+
         sedDatos.push(obj);
-       // 🔹 Crear el rectángulo azul de la SED
-const contratistaSED = nombreContratistaPorAlim(obj.alim, obj.sed);
-const colorSED = colorPorContratista(contratistaSED);
-const mark = L.rectangle(
-  [[obj.lat - 0.00005, obj.lon - 0.00005], [obj.lat + 0.00005, obj.lon + 0.00005]],
-  { color: colorSED, weight: 2, fillOpacity: 0.65 }
-).bindTooltip(`SED: ${obj.sed}<br>ALIM: ${obj.alim}<br>UT: ${obj.ut}<br>Contratista: ${contratistaSED}`);
-sedLayer.addLayer(mark);
-mark.on("click", () => {
-  registrarComparacion(obj.lat, obj.lon, "SED");
-});
-// 🔹 Agregar etiqueta fija debajo de la SED
-const labelIcon = L.divIcon({
-  className: "sed-label",
-  html: `<div>${obj.sed}</div>`,
-  iconSize: [80, 20],
-  iconAnchor: [40, -10] // ajusta altura bajo el rectángulo
-});
-const labelMarker = L.marker([obj.lat, obj.lon], { icon: labelIcon, interactive: false });
-sedLayer.addLayer(labelMarker);
+        indiceSED.set(obj.sed, obj);
       }
     });
-  });
+
+    console.log("✅ SED cargadas:", sedDatos.length);
+  })
+  .catch(err => console.error("❌ Error al cargar SED:", err));
 // --- CARGAR ATENCIONES DE 2024 Y 2025 ---
+// Se carga bajo demanda: recién cuando buscas un suministro o exportas sus atenciones.
 const urlsAtenciones = [
   "https://dl.dropboxusercontent.com/scl/fi/wmk8o9eexfkatckqghzp9/ATENCIONDEF.csv?rlkey=9d3y1vv1laf4e5upznta16b3s", // 2025
   "https://dl.dropboxusercontent.com/scl/fi/fjtukk004juggluv64m4j/ATENCION2024.csv?rlkey=v3a8g97dyleyi21f57xz8jgzl&st=vtfp9g5r" // 2024
 ];
 
-Promise.all(urlsAtenciones.map(url => fetch(url).then(r => r.text())))
-  .then(respuestas => {
-    respuestas.forEach((texto, idx) => {
-      const lineas = texto.trim().split(/\r?\n/);
-      lineas.slice(1).forEach(l => {
-        const cols = l.split(";");
-        if (cols.length >= 8) {
-          const ticket = cols[0].replace(/"/g, "").trim();
-          const tipoTrabajo = cols[1].replace(/"/g, "").trim();
-          const tipo = cols[2].replace(/"/g, "").trim();
-          const fecha = cols[3].replace(/"/g, "").trim();
-          const alim = cols[4].replace(/"/g, "").trim();
-          const sed = cols[5].replace(/"/g, "").trim();
-          const cliente = cols[7].replace(/"/g, "").trim();
-          if (cliente) {
-            atenciones.push({
-              ticket,
-              tipo: `${tipoTrabajo} - ${tipo}`,
-              fecha,
-              alim,
-              sed,
+function agregarAtencionAlIndice(registro) {
+  if (!indiceAtenciones.has(registro.cliente)) {
+    indiceAtenciones.set(registro.cliente, []);
+  }
+  indiceAtenciones.get(registro.cliente).push(registro);
+}
+
+function cargarAtencionesSiNecesario() {
+  if (atencionesListas) return Promise.resolve();
+  if (cargandoAtencionesPromise) return cargandoAtencionesPromise;
+
+  cargandoAtencionesPromise = Promise.all(urlsAtenciones.map(url => fetch(url).then(r => r.text())))
+    .then(respuestas => {
+      respuestas.forEach((texto, idx) => {
+        const lineas = texto.trim().split(/\r?\n/);
+        lineas.slice(1).forEach(l => {
+          const cols = l.split(";");
+          if (cols.length >= 8) {
+            const cliente = normalizarCliente(cols[7]);
+            if (!cliente) return;
+
+            const registro = {
+              ticket: cols[0].replace(/"/g, "").trim(),
+              tipo: `${cols[1].replace(/"/g, "").trim()} - ${cols[2].replace(/"/g, "").trim()}`,
+              fecha: cols[3].replace(/"/g, "").trim(),
+              alim: cols[4].replace(/"/g, "").trim(),
+              sed: cols[5].replace(/"/g, "").trim(),
               cliente,
               fuente: idx === 0 ? "2025" : "2024"
-            });
+            };
+
+            atenciones.push(registro);
+            agregarAtencionAlIndice(registro);
           }
-        }
+        });
       });
+
+      atencionesListas = true;
+      console.log("✅ Archivos de atenciones cargados bajo demanda:", atenciones.length, "registros totales");
+    })
+    .catch(err => {
+      cargandoAtencionesPromise = null;
+      console.error("❌ Error al cargar archivos de atenciones:", err);
+      throw err;
     });
-    console.log("✅ Archivos de atenciones combinados:", atenciones.length, "registros totales");
-  })
-  .catch(err => console.error("❌ Error al cargar archivos de atenciones:", err));
+
+  return cargandoAtencionesPromise;
+}
 
 // ============================
 // 🔹 CARGAR CLIENTES CADE1 Y CADE2
@@ -1202,7 +1198,7 @@ Promise.all([
       .map(l => {
         const cols = l.split(",");
         return {
-          CLIENTE: cols[0]?.trim().replace(/"/g, ""),
+          CLIENTE: normalizarCliente(cols[0]),
           ALIMCD: cols[1]?.trim().replace(/"/g, "")
         };
       })
@@ -1217,129 +1213,60 @@ Promise.all([
   });
 
   console.log("✅ CLIENTES-CADE cargados correctamente:", Object.keys(mapaClientes).length);
-// ============================
-// 🔶 CARGAR SAP DESDE GOOGLE SHEETS
-// ============================
-fetch("https://docs.google.com/spreadsheets/d/1O00gmsXQH1_Q_wf1s7Cb5trM1HESBAT7NlaD9XnHaOA/gviz/tq?tqx=out:csv&sheet=SAP")
-  .then(r => r.text())
-  .then(texto => {
-  const lineas = texto.trim().split(/\r?\n/);
-
-  lineas.slice(1).forEach(l => {
-    const cols = l.split(",");
-
-    const sap = cols[0]?.replace(/"/g,"").trim();        // A
-    const fechaRegistro = cols[1]?.replace(/"/g,"").trim(); // B
-    const motivo = cols[4]?.replace(/"/g,"").trim();    // E
-    const estado = cols[5]?.replace(/"/g,"").trim();    // F
-    const cliente = cols[8]?.replace(/"/g,"").trim().replace(/^0+/,""); // I
-    const fechaAtencion = cols[45]?.replace(/"/g,"").trim(); // AT
-
-    if (cliente && sap) {
-      mapaSAP[cliente] = {
-        sap,
-        motivo,
-        estado,
-        fechaRegistro,
-        fechaAtencion
-      };
-    }
-  });
-
-    console.log("✅ SAP cargados:", Object.keys(mapaSAP).length);
-
-    crearCapaSAP(); // 🔶 dibujar SAP
-  })
-  .catch(err => console.error("❌ Error al cargar SAP:", err));
 })
 .catch(err => console.error("❌ Error al cargar CLIENTES-CADE:", err));
-// ============================
-// 🔶 ESTILO SAP
-// ============================
-const estiloSAP = {
-  radius: 7,
-  color: "#ff7a00",
-  weight: 2,
-  fillColor: "#ffb74d",
-  fillOpacity: 0.9
-};
-
-function crearCapaSAP() {
-  capaSAP.clearLayers();
-  if (!ultimoEncontro && !ultimaSED) return;
-
-  const ref = ultimoEncontro || ultimaSED;
-  const latRef = ref.lat;
-  const lonRef = ref.lon;
-
-  datos.forEach(d => {
-    const info = mapaSAP[d.cliente];
-    if (!info) return;
-
-    const dMetros = distancia(latRef, lonRef, d.lat, d.lon);
-    if (dMetros > RADIO_VISUAL_SAP) return;
-
-    const alimSAP = mapaClientes[d.cliente] || "No disponible";
-    const popupSAP = `
-      <b>💡 SAP ${info.sap}</b><br>
-      🧾 ${info.motivo || "—"}<br>
-      📌 ${info.estado || "—"}<br>
-      ⚡ ${alimSAP}<br>
-      👷 ${nombreContratistaPorAlim(alimSAP)}<br>
-      <button class="btn btn-sm btn-warning mt-2"
-        onclick="copiarSAP('${info.sap}')">
-        📋 Copiar SAP
-      </button>
-    `;
-
-    const marker = L.marker([d.lat, d.lon], { icon: iconoSAP })
-      .bindPopup(popupSAP);
-
-    capaSAP.addLayer(marker);
-  });
-}
 // --- FUNCIONES ---
-function mostrarAtenciones(clienteID){
-  const lista=document.getElementById("listaAtenciones");
-  const panel=document.getElementById("panelAtenciones");
-  lista.innerHTML="";
+async function mostrarAtenciones(clienteID) {
+  const lista = document.getElementById("listaAtenciones");
+  const panel = document.getElementById("panelAtenciones");
+  lista.innerHTML = "";
   panel.classList.add("visible");
 
-  const idLimpio = clienteID.trim().replace(/"/g,"");
-
-  // 🔹 GUARDAR CLIENTE ACTUAL
+  const idLimpio = normalizarCliente(clienteID);
   clienteActualAtenciones = idLimpio;
 
-  const misAtenciones = atenciones.filter(a => a.cliente === idLimpio);
+  lista.innerHTML = `<li class="list-group-item text-muted">⏳ Cargando atenciones de ${idLimpio}...</li>`;
 
-  if(misAtenciones.length===0){
-    lista.innerHTML=`<li class="list-group-item text-muted">Sin atenciones registradas para ${idLimpio}</li>`;
+  try {
+    await cargarAtencionesSiNecesario();
+  } catch (err) {
+    lista.innerHTML = `<li class="list-group-item text-danger">❌ No se pudieron cargar las atenciones.</li>`;
     return;
   }
 
-misAtenciones.sort((a, b) => new Date(b.fecha) - new Date(a.fecha)).forEach(a => {
-  const li = document.createElement("li");
-  li.className = "list-group-item mb-2";
+  const misAtenciones = indiceAtenciones.get(idLimpio) || [];
 
-  // --- 🔹 Formatear fecha como dd/mm/aaaa ---
-  let fechaFormateada = a.fecha;
-  const fechaObj = new Date(a.fecha);
-  if (!isNaN(fechaObj)) {
-    const dia = String(fechaObj.getDate()).padStart(2, "0");
-    const mes = String(fechaObj.getMonth() + 1).padStart(2, "0");
-    const anio = fechaObj.getFullYear();
-    fechaFormateada = `${dia}/${mes}/${anio}`;
+  if (misAtenciones.length === 0) {
+    lista.innerHTML = `<li class="list-group-item text-muted">Sin atenciones registradas para ${idLimpio}</li>`;
+    return;
   }
 
-  li.innerHTML = `
-    🧾 <b>${a.ticket}</b><br>
-    🛠️ <b>Tipo:</b> ${a.tipo}<br>
-    📅 <b>Fecha:</b> ${fechaFormateada}<br>
-    ⚡ <b>Alim:</b> ${a.alim}<br>
-    🏷️ <b>SED:</b> ${a.sed}
-  `;
-  lista.appendChild(li);
-});
+  lista.innerHTML = "";
+
+  [...misAtenciones]
+    .sort((a, b) => new Date(b.fecha) - new Date(a.fecha))
+    .forEach(a => {
+      const li = document.createElement("li");
+      li.className = "list-group-item mb-2";
+
+      let fechaFormateada = a.fecha;
+      const fechaObj = new Date(a.fecha);
+      if (!isNaN(fechaObj)) {
+        const dia = String(fechaObj.getDate()).padStart(2, "0");
+        const mes = String(fechaObj.getMonth() + 1).padStart(2, "0");
+        const anio = fechaObj.getFullYear();
+        fechaFormateada = `${dia}/${mes}/${anio}`;
+      }
+
+      li.innerHTML = `
+        🧾 <b>${a.ticket}</b><br>
+        🛠️ <b>Tipo:</b> ${a.tipo}<br>
+        📅 <b>Fecha:</b> ${fechaFormateada}<br>
+        ⚡ <b>Alim:</b> ${a.alim}<br>
+        🏷️ <b>SED:</b> ${a.sed}
+      `;
+      lista.appendChild(li);
+    });
 }
 
 // Actualizar mapa / marcador principal
@@ -1595,12 +1522,23 @@ function registrarComparacion(lat, lon, tipo, detalle = "") {
 // --- FUNCION GENERAL PARA BUSCAR CERCANOS ---
 function obtenerCercanos(lat, lon, max = 5) {
   const limite = parseFloat(document.getElementById("radioInput").value) || 20;
-  const distancias = datos.map(d => ({
-    ...d,
-    dist: distancia(lat, lon, d.lat, d.lon)
-  }));
-  distancias.sort((a, b) => a.dist - b.dist);
-  return distancias.filter(d => d.dist < limite).slice(0, max);
+  const mejores = [];
+
+  // Evita crear y ordenar una copia completa de todos los suministros.
+  // Solo conserva los mejores resultados dentro del radio seleccionado.
+  for (const d of datos) {
+    const dist = distancia(lat, lon, d.lat, d.lon);
+    if (dist >= limite) continue;
+
+    mejores.push({ ...d, dist });
+    mejores.sort((a, b) => a.dist - b.dist);
+
+    if (mejores.length > max) {
+      mejores.pop();
+    }
+  }
+
+  return mejores;
 }
 
 // --- Limpiar markers cercanos previos ---
@@ -1612,8 +1550,8 @@ function limpiarCercanos() {
 // --- BUSCAR SUMINISTRO ---
 function buscarSuministro() {
   if (!datosListos) { resultado.textContent="⚠️ Espera a que termine la carga."; return; }
-  const num = searchBox.value.trim();
-  const encontrado = datos.find(d => d.cliente === num);
+  const num = normalizarCliente(searchBox.value);
+  const encontrado = indiceClientes.get(num);
   const lista = document.getElementById("cercanos");
   lista.innerHTML = "";
   limpiarCercanos();
@@ -1663,7 +1601,7 @@ function buscarSuministro() {
 // --- BUSCAR SED ---
 function buscarSED() {
   const nombre = searchSED.value.trim().toUpperCase();
-  const encontrado = sedDatos.find(s => s.sed === nombre);
+  const encontrado = indiceSED.get(nombre);
   const lista = document.getElementById("cercanosSED");
   lista.innerHTML = "";
   limpiarCercanos();
@@ -1832,44 +1770,77 @@ btnAtenciones.addEventListener("click", () => {
 // ============================
 // 🔹 CARGAR ARCHIVO SED_CLIENTES
 // ============================
+// Se carga bajo demanda: recién al presionar "Detalle SED".
 let sedClientes = [];
 
-fetch("https://dl.dropboxusercontent.com/scl/fi/z8sr9bae1ds4myo7dmbni/SED_CLIENTES.csv?rlkey=3d7xy5746v3a3lpemiorp7sj0&st=bcf3izrn")
-  .then(r => r.text())
-  .then(texto => {
-    const lineas = texto.trim().split(/\r?\n/);
-    lineas.slice(1).forEach(l => {
-      const cols = l.split(",");
-      if (cols.length >= 3) {
-        sedClientes.push({
-          sed: cols[0].trim().toUpperCase(),
-          llave: cols[1].trim(),
-          clientes: parseInt(cols[2]) || 0
-        });
-      }
-    });
-    console.log("✅ Archivo SED_CLIENTES cargado:", sedClientes.length, "registros");
-  })
-  .catch(err => console.error("❌ Error al cargar SED_CLIENTES:", err));
+function agregarSedClienteAlIndice(registro) {
+  if (!indiceSedClientes.has(registro.sed)) {
+    indiceSedClientes.set(registro.sed, []);
+  }
+  indiceSedClientes.get(registro.sed).push(registro);
+}
 
+function cargarSedClientesSiNecesario() {
+  if (sedClientesListas) return Promise.resolve();
+  if (cargandoSedClientesPromise) return cargandoSedClientesPromise;
+
+  cargandoSedClientesPromise = fetch("https://dl.dropboxusercontent.com/scl/fi/z8sr9bae1ds4myo7dmbni/SED_CLIENTES.csv?rlkey=3d7xy5746v3a3lpemiorp7sj0&st=bcf3izrn")
+    .then(r => r.text())
+    .then(texto => {
+      const lineas = texto.trim().split(/\r?\n/);
+      lineas.slice(1).forEach(l => {
+        const cols = l.split(",");
+        if (cols.length >= 3) {
+          const registro = {
+            sed: cols[0].trim().toUpperCase(),
+            llave: cols[1].trim(),
+            clientes: parseInt(cols[2]) || 0
+          };
+
+          if (!registro.sed) return;
+
+          sedClientes.push(registro);
+          agregarSedClienteAlIndice(registro);
+        }
+      });
+
+      sedClientesListas = true;
+      console.log("✅ Archivo SED_CLIENTES cargado bajo demanda:", sedClientes.length, "registros");
+    })
+    .catch(err => {
+      cargandoSedClientesPromise = null;
+      console.error("❌ Error al cargar SED_CLIENTES:", err);
+      throw err;
+    });
+
+  return cargandoSedClientesPromise;
+}
 
 // ============================
 // 🔹 MOSTRAR DETALLE DE UNA SED
 // ============================
-function mostrarDetalleSED(nombreSED) {
+async function mostrarDetalleSED(nombreSED) {
   const modal = new bootstrap.Modal(document.getElementById("detalleSEDModal"));
   const tabla = document.getElementById("tablaDetalleSED");
   const titulo = document.getElementById("detalleSEDNombre");
   const totalDiv = document.getElementById("totalClientesSED");
 
-  tabla.innerHTML = "";
+  tabla.innerHTML = `<tr><td colspan="2" class="text-muted">⏳ Cargando detalle...</td></tr>`;
   totalDiv.textContent = "";
   titulo.textContent = "SED: " + nombreSED;
+  modal.show();
 
-  const registros = sedClientes.filter(s => s.sed === nombreSED);
+  try {
+    await cargarSedClientesSiNecesario();
+  } catch (err) {
+    tabla.innerHTML = `<tr><td colspan="2" class="text-danger">❌ No se pudo cargar el detalle de SED.</td></tr>`;
+    return;
+  }
+
+  tabla.innerHTML = "";
+  const registros = indiceSedClientes.get(nombreSED) || [];
   if (registros.length === 0) {
     tabla.innerHTML = `<tr><td colspan="2" class="text-muted">Sin información disponible</td></tr>`;
-    modal.show();
     return;
   }
 
@@ -1882,7 +1853,6 @@ function mostrarDetalleSED(nombreSED) {
   });
 
   totalDiv.textContent = `Total de clientes: ${total}`;
-  modal.show();
 }
 // Actualizar etiqueta visual del radio
 const radioInput = document.getElementById("radioInput");
@@ -1898,14 +1868,20 @@ function cambiarModoBusqueda() {
   document.getElementById("bloqueCoord").style.display = (modo === "coordenadas") ? "block" : "none";
 }
 
-function exportarAtencionesExcel() {
+async function exportarAtencionesExcel() {
   if (!clienteActualAtenciones) {
     alert("No hay suministro seleccionado");
     return;
   }
 
-  const filas = atenciones
-    .filter(a => a.cliente === clienteActualAtenciones)
+  try {
+    await cargarAtencionesSiNecesario();
+  } catch (err) {
+    alert("No se pudieron cargar las atenciones para exportar.");
+    return;
+  }
+
+  const filas = [...(indiceAtenciones.get(clienteActualAtenciones) || [])]
     .sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
 
   if (filas.length === 0) {
@@ -1928,41 +1904,6 @@ function exportarAtencionesExcel() {
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
-}
-function copiarSAP(sap) {
-  navigator.clipboard.writeText(sap).then(() => {
-    alert("✅ SAP copiado: " + sap);
-  });
-}
-function filtrarSAP() {
-  const desdeInput = document.getElementById("sapDesde");
-  const hastaInput = document.getElementById("sapHasta");
-
-  if (!desdeInput || !hastaInput) return;
-
-  const desde = desdeInput.value;
-  const hasta = hastaInput.value;
-
-  capaSAP.clearLayers();
-
-  datos.forEach(d => {
-    const info = mapaSAP[d.cliente];
-    if (!info) return;
-
-    if (desde && info.fechaRegistro < desde) return;
-    if (hasta && info.fechaRegistro > hasta) return;
-
-    const marker = L.marker([d.lat, d.lon], { icon: iconoSAP })
-      .bindPopup(`💡 SAP ${info.sap}`);
-
-    capaSAP.addLayer(marker);
-  });
-
-  if (!sapVisible) {
-    map.addLayer(capaSAP);
-    sapVisible = true;
-    btnSAP.textContent = "❌ Ocultar SAP";
-  }
 }
 
 function escucharTecnicosTiempoReal() {
@@ -2018,35 +1959,38 @@ function escucharTecnicosTiempoReal() {
 }
 
 
-window.addEventListener("firebase-listo", () => {
-  console.log("✅ Firebase listo");
-  escucharTecnicosTiempoReal();
-});
+async function cargarFirebaseTecnicos() {
+  if (firebaseInicializado) return;
 
-</script>
-
-<script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-  import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+  const [{ initializeApp }, { getDatabase, ref, onValue }] = await Promise.all([
+    import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js"),
+    import("https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js")
+  ]);
 
   const firebaseConfig = {
-  apiKey: "AIzaSyCNZD_oTI7jC_7rfHZ-XGRaxjhFz8aODD4",
-  authDomain: "ubicacionesreal.firebaseapp.com",
-  databaseURL: "https://ubicacionesreal-default-rtdb.firebaseio.com",
-  projectId: "ubicacionesreal",
-  storageBucket: "ubicacionesreal.firebasestorage.app",
-  messagingSenderId: "8523717990",
-  appId: "1:8523717990:web:57cd5d30146471a8687ca7"
-};
+    apiKey: "AIzaSyCNZD_oTI7jC_7rfHZ-XGRaxjhFz8aODD4",
+    authDomain: "ubicacionesreal.firebaseapp.com",
+    databaseURL: "https://ubicacionesreal-default-rtdb.firebaseio.com",
+    projectId: "ubicacionesreal",
+    storageBucket: "ubicacionesreal.firebasestorage.app",
+    messagingSenderId: "8523717990",
+    appId: "1:8523717990:web:57cd5d30146471a8687ca7"
+  };
 
   const appFirebase = initializeApp(firebaseConfig);
-  const dbFirebase = getDatabase(appFirebase);
-
-  window.dbFirebase = dbFirebase;
+  window.dbFirebase = getDatabase(appFirebase);
   window.refFirebase = ref;
   window.onValueFirebase = onValue;
+  firebaseInicializado = true;
+}
 
-  window.dispatchEvent(new Event("firebase-listo"));
+async function iniciarTecnicosSiNecesario() {
+  if (escuchandoTecnicos) return;
+  await cargarFirebaseTecnicos();
+  escucharTecnicosTiempoReal();
+  escuchandoTecnicos = true;
+}
+
 </script>
 
 <!-- MODAL DETALLE SED -->
