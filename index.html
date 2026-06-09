@@ -60,8 +60,11 @@ input[type=range] {
 #panelHerramientas {
   position: absolute;
   left: 340px;
-  bottom: 120px;
+  top: 85px;              /* evita que el panel se pierda por arriba */
+  bottom: 90px;           /* deja visible el botón inferior */
   width: 300px;
+  max-height: calc(100vh - 175px);
+  overflow-y: auto;       /* ahora el contenido se desplaza dentro del panel */
   background: #ffffff;
   border: 2px solid #ddd;
   border-radius: 10px;
@@ -72,7 +75,23 @@ input[type=range] {
   opacity: 0;
   pointer-events: none;
   transform: translateY(10px);
-  transition: all 0.3s ease-in-out;
+  transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
+}
+
+#panelHerramientas::-webkit-scrollbar {
+  width: 8px;
+}
+#panelHerramientas::-webkit-scrollbar-thumb {
+  background: #b8c2cc;
+  border-radius: 8px;
+}
+
+@media (max-height: 760px) {
+  #panelHerramientas {
+    top: 65px;
+    bottom: 65px;
+    max-height: calc(100vh - 130px);
+  }
 }
 
 #panelHerramientas.visible {
@@ -80,6 +99,43 @@ input[type=range] {
   pointer-events: auto;
   transform: translateY(0);
 }
+
+
+
+/* ============================
+   🧾 Atenciones activas desde Excel
+   ============================ */
+.atencion-activa-icon {
+  background: transparent;
+}
+.atencion-activa-pin {
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  width:34px;
+  height:34px;
+  border-radius:50%;
+  background:white;
+  box-shadow:0 2px 8px rgba(0,0,0,0.35);
+  font-size:17px;
+}
+.atencion-activa-pin-antigua {
+  background:#fff1f1;
+  box-shadow:0 0 0 4px rgba(220,53,69,0.18), 0 2px 10px rgba(0,0,0,0.35);
+}
+#listaAtencionesActivasFiltradas .list-group-item {
+  cursor: pointer;
+}
+
+
+/* Cruce 3 archivos integrado */
+.cruce-integrado-box { border: 1px solid #e5e7eb; border-radius: 10px; padding: 10px; background: #f8fafc; }
+.cruce-integrado-box label { font-size: 11px; font-weight: 700; color: #334155; margin-bottom: 3px; }
+.cruce-integrado-box input[type=file] { font-size: 11px; }
+.cruce-integrado-box .cruce-mini { font-size: 11px; line-height: 1.35; color: #64748b; }
+.cruce-integrado-box .cruce-ok { color: #198754; font-weight: 700; }
+.cruce-integrado-box .cruce-warn { color: #fd7e14; font-weight: 700; }
+.cruce-integrado-box .cruce-err { color: #dc3545; font-weight: 700; }
 
 </style>
 </head>
@@ -212,6 +268,65 @@ input[type=range] {
   </div>
 
 
+
+  <div class="card mb-3">
+    <div class="card-body p-2">
+      <h6 class="mb-2">🧾 Atenciones activas</h6>
+
+      <button id="btnCargarActivosExcel" class="btn btn-dark btn-sm w-100 mb-2">
+        📂 Cargar Excel de activos
+      </button>
+      <input type="file" id="inputActivosExcel" accept=".xlsx,.xls" style="display:none;">
+
+      <button id="btnToggleAtencionesActivas" class="btn btn-outline-dark btn-sm w-100 mb-2" style="display:none;">
+        👁️ Mostrar activos en mapa
+      </button>
+
+      <button id="btnVerAntiguosActivos" class="btn btn-outline-danger btn-sm w-100 mb-2" style="display:none;">
+        🕘 Ver más antiguos
+      </button>
+
+      <input type="text" id="filtroAtencionesActivas" class="form-control form-control-sm mb-2" style="display:none;"
+             placeholder="Filtrar ticket, ODM, distrito, contratista, inicio">
+
+      <div id="resumenAtencionesActivas" class="small text-muted mb-2">
+        Carga tu cruce Excel para pintar tickets activos con ODM.
+      </div>
+
+      <div id="listaAtencionesActivasFiltradas" class="list-group small"
+           style="display:none; max-height:220px; overflow-y:auto;"></div>
+    </div>
+  </div>
+
+
+
+  <div class="card mb-3">
+    <div class="card-body p-2">
+      <h6 class="mb-2">🔗 Cruce 3 archivos</h6>
+      <div class="cruce-integrado-box mb-2">
+        <div class="mb-2">
+          <label for="cruceTicketsInput" class="form-label mb-1">1) Tickets activos</label>
+          <input type="file" id="cruceTicketsInput" class="form-control form-control-sm" accept=".xlsx,.xls,.csv">
+        </div>
+        <div class="mb-2">
+          <label for="cruceCallsInput" class="form-label mb-1">2) Fallo del cliente / llamadas</label>
+          <input type="file" id="cruceCallsInput" class="form-control form-control-sm" accept=".xlsx,.xls,.csv">
+        </div>
+        <div class="mb-2">
+          <label for="cruceFsmInput" class="form-label mb-1">3) Export FSM</label>
+          <input type="file" id="cruceFsmInput" class="form-control form-control-sm" accept=".xlsx,.xls,.csv">
+        </div>
+        <button id="btnCruzar3ArchivosMapa" class="btn btn-primary btn-sm w-100 mb-2">🔍 Cruzar y pintar mapa</button>
+        <button id="btnExportarCruceMapaExcel" class="btn btn-success btn-sm w-100 mb-2" style="display:none;">📊 Descargar Excel cruce</button>
+        <button id="btnExportarActivosJsonRepo" class="btn btn-outline-primary btn-sm w-100 mb-2" style="display:none;">🌐 Descargar data online JSON</button>
+        <div id="estadoCruceMapa" class="cruce-mini">Sube los 3 archivos para generar el cruce y pintar los activos.</div>
+      </div>
+      <div class="small text-muted">
+        Para que todos lo vean online, sube el JSON descargado como <b>data/activos_mapa.json</b> en tu repositorio.
+      </div>
+    </div>
+  </div>
+
   <button id="btnSED" class="btn btn-primary btn-sm w-100 mb-2">
     📡 Mostrar SEDs
   </button>
@@ -238,6 +353,7 @@ input[type=range] {
 <div id="map"></div>
 
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script>
 let datos = [], sedDatos = [], historial = [], cercanosMarkers = [], atenciones = [];
 const indiceClientes = new Map();       // cliente -> coordenadas/UT
@@ -272,6 +388,17 @@ let tecnicosVisible = false;
 let markersTecnicos = {};
 let tecnicosData = {};
 
+// ============================
+// 🧾 CAPA ATENCIONES ACTIVAS DESDE EXCEL
+// ============================
+let capaAtencionesActivas = L.featureGroup();
+let atencionesActivasVisible = false;
+let atencionesActivasData = [];
+let markersAtencionesActivas = {};
+let nombreArchivoAtencionesActivas = "";
+let modoSoloAntiguosActivos = false;
+const HORAS_ANTIGUO_ACTIVO = 4; // rojo desde 4 horas de antigüedad
+
 // Inicializa mapa
 map = L.map('map').setView([-11.95, -76.95], 8);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -279,6 +406,64 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 }).addTo(map);
 const btnRespAlim = document.getElementById("btnRespAlim");
 const btnTecnicos = document.getElementById("btnTecnicos");
+
+// ============================
+// 📂 BOTONES ATENCIONES ACTIVAS DESDE EXCEL
+// ============================
+const btnCargarActivosExcel = document.getElementById("btnCargarActivosExcel");
+const inputActivosExcel = document.getElementById("inputActivosExcel");
+const btnToggleAtencionesActivas = document.getElementById("btnToggleAtencionesActivas");
+const btnVerAntiguosActivos = document.getElementById("btnVerAntiguosActivos");
+const filtroAtencionesActivas = document.getElementById("filtroAtencionesActivas");
+
+const cruceTicketsInput = document.getElementById("cruceTicketsInput");
+const cruceCallsInput = document.getElementById("cruceCallsInput");
+const cruceFsmInput = document.getElementById("cruceFsmInput");
+const btnCruzar3ArchivosMapa = document.getElementById("btnCruzar3ArchivosMapa");
+const btnExportarCruceMapaExcel = document.getElementById("btnExportarCruceMapaExcel");
+const btnExportarActivosJsonRepo = document.getElementById("btnExportarActivosJsonRepo");
+const estadoCruceMapa = document.getElementById("estadoCruceMapa");
+
+if (btnCargarActivosExcel && inputActivosExcel) {
+  btnCargarActivosExcel.addEventListener("click", () => {
+    inputActivosExcel.click();
+  });
+}
+
+if (inputActivosExcel) {
+  inputActivosExcel.addEventListener("change", async (ev) => {
+    const archivo = ev.target.files && ev.target.files[0];
+    if (!archivo) return;
+
+    await cargarAtencionesActivasDesdeExcel(archivo);
+
+    // Permite volver a cargar el mismo archivo si lo seleccionas otra vez.
+    ev.target.value = "";
+  });
+}
+
+if (btnToggleAtencionesActivas) {
+  btnToggleAtencionesActivas.addEventListener("click", alternarAtencionesActivas);
+}
+
+if (btnVerAntiguosActivos) {
+  btnVerAntiguosActivos.addEventListener("click", alternarVistaAntiguosActivos);
+}
+
+if (filtroAtencionesActivas) {
+  filtroAtencionesActivas.addEventListener("input", refrescarListaAtencionesActivas);
+}
+
+
+if (btnCruzar3ArchivosMapa) {
+  btnCruzar3ArchivosMapa.addEventListener("click", cruzar3ArchivosYPintarMapa);
+}
+if (btnExportarCruceMapaExcel) {
+  btnExportarCruceMapaExcel.addEventListener("click", exportarCruceMapaExcel);
+}
+if (btnExportarActivosJsonRepo) {
+  btnExportarActivosJsonRepo.addEventListener("click", exportarActivosJsonRepositorio);
+}
 
 btnRespAlim.addEventListener("click", () => {
   if (!respAlimVisible) {
@@ -1215,6 +1400,1041 @@ Promise.all([
   console.log("✅ CLIENTES-CADE cargados correctamente:", Object.keys(mapaClientes).length);
 })
 .catch(err => console.error("❌ Error al cargar CLIENTES-CADE:", err));
+
+// ============================
+// 🧾 FUNCIONES ATENCIONES ACTIVAS DESDE EXCEL
+// ============================
+function normalizarCabeceraExcel(valor) {
+  return (valor || "")
+    .toString()
+    .trim()
+    .toUpperCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[º°]/g, "")
+    .replace(/[^A-Z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
+function normalizarFilaExcel(fila) {
+  const salida = {};
+  Object.entries(fila || {}).forEach(([clave, valor]) => {
+    salida[normalizarCabeceraExcel(clave)] = valor;
+  });
+  return salida;
+}
+
+function obtenerCampoExcel(filaNormalizada, candidatos) {
+  for (const c of candidatos) {
+    const key = normalizarCabeceraExcel(c);
+    const valor = filaNormalizada[key];
+    if (valor !== undefined && valor !== null && valor !== "") return valor;
+  }
+  return "";
+}
+
+function limpiarTextoExcel(valor) {
+  return (valor === undefined || valor === null) ? "" : valor.toString().trim();
+}
+
+function escapeHtml(valor) {
+  return limpiarTextoExcel(valor)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function parsearNumeroExcel(valor) {
+  if (valor === undefined || valor === null || valor === "") return NaN;
+  const txt = valor.toString().trim().replace(/,/g, ".");
+  const m = txt.match(/-?\d+(?:\.\d+)?/);
+  return m ? parseFloat(m[0]) : NaN;
+}
+
+function obtenerCoordenadasActivas(fila) {
+  let lat = parsearNumeroExcel(obtenerCampoExcel(fila, ["LATITUD_BASE", "Latitud", "LATITUD", "Y"]));
+  let lon = parsearNumeroExcel(obtenerCampoExcel(fila, ["LONGITUD_BASE", "Longitud", "LONGITUD", "X"]));
+
+  if (!isNaN(lat) && !isNaN(lon)) return { lat, lon };
+
+  const coord = limpiarTextoExcel(obtenerCampoExcel(fila, ["COORDENADAS", "Coordenadas", "Ubicacion", "Ubicación"]));
+  const nums = coord.replace(/,/g, ".").match(/-?\d+(?:\.\d+)?/g);
+  if (nums && nums.length >= 2) {
+    const a = parseFloat(nums[0]);
+    const b = parseFloat(nums[1]);
+
+    // Si el primer valor parece longitud (-77) y el segundo latitud (-12), invierte.
+    if (Math.abs(a) > 30 && Math.abs(b) < 30) {
+      lon = a;
+      lat = b;
+    } else {
+      lat = a;
+      lon = b;
+    }
+  }
+
+  return { lat, lon };
+}
+
+function esTicketActivoExcel(estado) {
+  const e = normalizarCabeceraExcel(estado).replace(/_/g, " ");
+  if (!e) return true;
+  const noActivos = ["RESTAURADO", "FINALIZADO", "CERRADO", "ANULADO", "CANCELADO"];
+  return !noActivos.some(x => e.includes(x));
+}
+
+function esOdmActivaExcel(odmActiva, estadoOdm) {
+  const v = normalizarCabeceraExcel(odmActiva).replace(/_/g, " ");
+  const e = normalizarCabeceraExcel(estadoOdm).replace(/_/g, " ");
+
+  if (["SI", "S", "TRUE", "VERDADERO", "1", "ACTIVA", "ACTIVO"].includes(v)) return true;
+  if (["NO", "FALSE", "FALSO", "0", "INACTIVA", "INACTIVO"].includes(v)) return false;
+  if (["ASI", "DES", "INC", "INI", "LLA", "REA"].includes(e)) return true;
+  if (e.includes("ANU") || e.includes("ANUL")) return false;
+
+  return false;
+}
+
+function parsearFechaInicioActiva(valor) {
+  if (!valor) return null;
+  if (valor instanceof Date && !isNaN(valor.getTime())) return valor;
+
+  const txt = limpiarTextoExcel(valor);
+  if (!txt || txt === "96" || txt === "—") return null;
+
+  // Formato esperado del cruce: dd/mm/yyyy hh:mm:ss
+  let m = txt.match(/^(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?\s+(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if (m) {
+    let dia = parseInt(m[1], 10);
+    let mes = parseInt(m[2], 10);
+    let anio = m[3] ? parseInt(m[3], 10) : new Date().getFullYear();
+    if (anio < 100) anio += 2000;
+    const hora = parseInt(m[4], 10) || 0;
+    const minuto = parseInt(m[5], 10) || 0;
+    const segundo = parseInt(m[6] || "0", 10) || 0;
+    const fecha = new Date(anio, mes - 1, dia, hora, minuto, segundo);
+    return isNaN(fecha.getTime()) ? null : fecha;
+  }
+
+  // Fallback para otros formatos que pueda entregar Excel/SheetJS.
+  const fallback = new Date(txt);
+  return isNaN(fallback.getTime()) ? null : fallback;
+}
+
+function formatearFechaInicioActiva(valor, fecha = null) {
+  const f = fecha || parsearFechaInicioActiva(valor);
+  if (!f) return limpiarTextoExcel(valor) || "—";
+
+  const dd = String(f.getDate()).padStart(2, "0");
+  const mm = String(f.getMonth() + 1).padStart(2, "0");
+  const yyyy = f.getFullYear();
+  const hh = String(f.getHours()).padStart(2, "0");
+  const mi = String(f.getMinutes()).padStart(2, "0");
+  return `${dd}/${mm}/${yyyy} ${hh}:${mi}`;
+}
+
+function calcularHorasAntiguedadActiva(item) {
+  if (!item || !item.fechaInicioMs) return null;
+  const horas = (Date.now() - item.fechaInicioMs) / 3600000;
+  return isFinite(horas) ? horas : null;
+}
+
+function textoAntiguedadActiva(item) {
+  const horas = calcularHorasAntiguedadActiva(item);
+  if (horas == null) return "—";
+  if (horas < 1) return `${Math.max(0, Math.round(horas * 60))} min`;
+  return `${horas.toFixed(1)} h`;
+}
+
+function esAtencionAntigua(item) {
+  const horas = calcularHorasAntiguedadActiva(item);
+  return horas != null && horas >= HORAS_ANTIGUO_ACTIVO;
+}
+
+function ordenarPorMasAntiguos(items) {
+  return [...items].sort((a, b) => {
+    const fa = a.fechaInicioMs || Number.POSITIVE_INFINITY;
+    const fb = b.fechaInicioMs || Number.POSITIVE_INFINITY;
+    return fa - fb;
+  });
+}
+
+function obtenerAtencionesActivasParaMapa() {
+  const base = modoSoloAntiguosActivos
+    ? atencionesActivasData.filter(esAtencionAntigua)
+    : atencionesActivasData;
+  return ordenarPorMasAntiguos(base);
+}
+
+function actualizarBotonAntiguosActivos() {
+  if (!btnVerAntiguosActivos) return;
+  btnVerAntiguosActivos.textContent = modoSoloAntiguosActivos
+    ? "↩️ Ver todos los activos"
+    : "🕘 Ver más antiguos";
+  btnVerAntiguosActivos.classList.toggle("btn-danger", modoSoloAntiguosActivos);
+  btnVerAntiguosActivos.classList.toggle("btn-outline-danger", !modoSoloAntiguosActivos);
+}
+
+function alternarVistaAntiguosActivos() {
+  if (atencionesActivasData.length === 0) {
+    if (inputActivosExcel) inputActivosExcel.click();
+    return;
+  }
+
+  modoSoloAntiguosActivos = !modoSoloAntiguosActivos;
+  actualizarBotonAntiguosActivos();
+  dibujarAtencionesActivas();
+  refrescarListaAtencionesActivas();
+
+  if (atencionesActivasVisible && capaAtencionesActivas.getLayers().length > 0) {
+    map.fitBounds(capaAtencionesActivas.getBounds().pad(0.15));
+  } else if (modoSoloAntiguosActivos) {
+    alert(`No hay tickets con más de ${HORAS_ANTIGUO_ACTIVO} horas de antigüedad.`);
+  }
+}
+
+function colorAtencionActiva(item) {
+  if (esAtencionAntigua(item)) return "#dc3545"; // rojo: ticket antiguo
+  if (!item.odm) return "#fd7e14";               // naranja: sin ODM/FSM
+  if (item.odmActiva) return "#198754";          // verde: ODM activa
+  return "#ffc107";                              // amarillo: ODM no activa / revisar
+}
+
+function crearIconoAtencionActiva(item) {
+  const color = colorAtencionActiva(item);
+  const antiguo = esAtencionAntigua(item);
+  const emoji = antiguo ? "🕘" : (item.odmActiva ? "✅" : (item.odm ? "⚠️" : "❌"));
+  const claseAntigua = antiguo ? " atencion-activa-pin-antigua" : "";
+
+  return L.divIcon({
+    className: "atencion-activa-icon",
+    html: `<div class="atencion-activa-pin${claseAntigua}" style="border:3px solid ${color}; color:${color};">${emoji}</div>`,
+    iconSize: [36, 36],
+    iconAnchor: [18, 18],
+    popupAnchor: [0, -18]
+  });
+}
+
+function badgeOdmActiva(item) {
+  if (!item.odm) return `<span class="badge bg-danger">Sin ODM/FSM</span>`;
+  if (item.odmActiva) return `<span class="badge bg-success">ODM activa</span>`;
+  return `<span class="badge bg-warning text-dark">Revisar ODM</span>`;
+}
+
+function crearPopupAtencionActiva(item) {
+  const detalle = item.detalleOdms ? `<hr class="my-2"><div style="max-height:120px; overflow:auto;"><b>Detalle FSM:</b><br>${escapeHtml(item.detalleOdms).replace(/\n/g, "<br>")}</div>` : "";
+
+  return `
+    <div style="min-width:260px;">
+      <b>🎫 Ticket:</b> ${escapeHtml(item.ticket)}<br>
+      <b>Estado ticket:</b> ${escapeHtml(item.estadoTicket || "—")}<br>
+      <b>Hora de inicio:</b> ${escapeHtml(item.horaInicio || "—")}<br>
+      <b>Antigüedad:</b> <span style="color:${esAtencionAntigua(item) ? '#dc3545' : '#6c757d'}; font-weight:700;">${escapeHtml(textoAntiguedadActiva(item))}</span><br>
+      <b>Última ODM:</b> ${escapeHtml(item.odm || "SIN ODM")}<br>
+      <b>Estado última ODM:</b> ${escapeHtml(item.estadoOdm || "—")}<br>
+      <b>Validación:</b> ${badgeOdmActiva(item)}<br>
+      <hr class="my-2">
+      <b>Contratista:</b> ${escapeHtml(item.contratista || "—")}<br>
+      <b>Alimentador:</b> ${escapeHtml(item.alimentador || "—")}<br>
+      <b>SED:</b> ${escapeHtml(item.sed || "—")}<br>
+      <b>Distrito:</b> ${escapeHtml(item.distrito || "—")}<br>
+      <b>Suministro:</b> ${escapeHtml(item.suministro || "—")}<br>
+      <b>Dirección:</b> ${escapeHtml(item.direccion || "—")}
+      ${detalle}
+    </div>
+  `;
+}
+
+function convertirFilaActiva(filaOriginal, idx) {
+  const f = normalizarFilaExcel(filaOriginal);
+  const coords = obtenerCoordenadasActivas(f);
+  const ticket = limpiarTextoExcel(obtenerCampoExcel(f, ["Ticket", "TICKET", "GESI"]));
+  const estadoTicket = limpiarTextoExcel(obtenerCampoExcel(f, ["Estado", "ESTADO", "Estado Ticket", "ESTADO_TICKET"]));
+  const odm = limpiarTextoExcel(obtenerCampoExcel(f, ["ODM", "ORDEN", "ORDEN_TRABAJO", "ORDEN DE TRABAJO"]));
+  const estadoOdm = limpiarTextoExcel(obtenerCampoExcel(f, ["ESTADO_ODM", "Estado ODM", "ESTADO ORDEN", "Estado Orden"]));
+  const odmActivaTxt = limpiarTextoExcel(obtenerCampoExcel(f, ["ODM_ACTIVA", "ODM ACTIVA", "ODM_Activa"]));
+  const detalleOdms = limpiarTextoExcel(obtenerCampoExcel(f, ["DETALLE_ODMS_FSM", "Detalle ODMS FSM", "DETALLE ODM", "DETALLE_ODM"]));
+  const horaInicioRaw = obtenerCampoExcel(f, ["Hora de inicio", "HORA DE INICIO", "HORA_INICIO", "Fecha inicio", "FECHA_INICIO", "FECHA INICIO", "CreatedDate", "CREATEDDATE"]);
+  const fechaInicio = parsearFechaInicioActiva(horaInicioRaw);
+
+  return {
+    id: ticket || `fila_${idx + 1}`,
+    ticket,
+    estadoTicket,
+    lat: coords.lat,
+    lon: coords.lon,
+    odm,
+    estadoOdm,
+    odmActiva: esOdmActivaExcel(odmActivaTxt, estadoOdm),
+    odmActivaTxt,
+    detalleOdms,
+    contratista: limpiarTextoExcel(obtenerCampoExcel(f, ["CONTRATISTA", "Contratista", "EMPRESA"])),
+    alimentador: limpiarTextoExcel(obtenerCampoExcel(f, ["Alimentador", "ALIMENTADOR", "Alimentador_2", "Cód. alimentador", "Cod alimentador"])),
+    sed: limpiarTextoExcel(obtenerCampoExcel(f, ["SED"])),
+    distrito: limpiarTextoExcel(obtenerCampoExcel(f, ["Distrito", "DISTRITO", "DISTRITO_LLAMADA"])),
+    suministro: normalizarCliente(obtenerCampoExcel(f, ["SUMINISTRO_LLAMADA", "Suministro", "SUMINISTRO", "CLIENTE"])),
+    direccion: limpiarTextoExcel(obtenerCampoExcel(f, ["DIRECCION_CONTACTO", "Dirección", "Direccion", "DIRECCION"])),
+    horaInicio: formatearFechaInicioActiva(horaInicioRaw, fechaInicio),
+    fechaInicioMs: fechaInicio ? fechaInicio.getTime() : null,
+    filaExcel: idx + 2
+  };
+}
+
+async function cargarAtencionesActivasDesdeExcel(archivo) {
+  const resumen = document.getElementById("resumenAtencionesActivas");
+  const lista = document.getElementById("listaAtencionesActivasFiltradas");
+
+  if (typeof XLSX === "undefined") {
+    alert("No cargó la librería para leer Excel. Revisa tu conexión e intenta nuevamente.");
+    return;
+  }
+
+  if (resumen) resumen.textContent = "⏳ Leyendo Excel de activos...";
+  if (lista) lista.style.display = "none";
+
+  try {
+    const buffer = await archivo.arrayBuffer();
+    const workbook = XLSX.read(buffer, { type: "array", cellDates: true });
+    const hojaNombre = workbook.SheetNames.includes("CRUCE_3_EXCEL") ? "CRUCE_3_EXCEL" : workbook.SheetNames[0];
+    const hoja = workbook.Sheets[hojaNombre];
+    const filas = XLSX.utils.sheet_to_json(hoja, { defval: "", raw: false });
+
+    const convertidas = ordenarPorMasAntiguos(filas
+      .map(convertirFilaActiva)
+      .filter(x => x.ticket && !isNaN(x.lat) && !isNaN(x.lon) && esTicketActivoExcel(x.estadoTicket)));
+
+    atencionesActivasData = convertidas;
+    modoSoloAntiguosActivos = false;
+    actualizarBotonAntiguosActivos();
+    nombreArchivoAtencionesActivas = archivo.name;
+    dibujarAtencionesActivas();
+    refrescarListaAtencionesActivas();
+
+    const total = filas.length;
+    const conOdm = atencionesActivasData.filter(x => x.odmActiva).length;
+    const sinOdm = atencionesActivasData.filter(x => !x.odm).length;
+    const antiguos = atencionesActivasData.filter(esAtencionAntigua).length;
+    const masAntiguo = atencionesActivasData.find(x => x.fechaInicioMs);
+    const textoMasAntiguo = masAntiguo
+      ? `<br><span class="text-danger">🕘 Más antiguo: ${escapeHtml(masAntiguo.ticket)} · ${escapeHtml(masAntiguo.horaInicio)} · ${escapeHtml(textoAntiguedadActiva(masAntiguo))}</span>`
+      : "";
+
+    if (resumen) {
+      resumen.innerHTML = `✅ <b>${atencionesActivasData.length}</b> activos con coordenadas cargados<br>
+        <span class="text-muted">Archivo: ${escapeHtml(archivo.name)}</span><br>
+        <span class="text-danger">${antiguos} antiguos (&gt; ${HORAS_ANTIGUO_ACTIVO} h, pintados rojo)</span> ·
+        <span class="text-success">${conOdm} con ODM activa</span> ·
+        <span class="text-warning">${sinOdm} sin ODM/FSM</span> ·
+        <span class="text-muted">${total - atencionesActivasData.length} filtrados/sin coordenadas</span>${textoMasAntiguo}`;
+    }
+
+    if (btnToggleAtencionesActivas) {
+      btnToggleAtencionesActivas.style.display = "block";
+      btnToggleAtencionesActivas.textContent = "❌ Ocultar activos en mapa";
+    }
+    if (btnVerAntiguosActivos) {
+      btnVerAntiguosActivos.style.display = "block";
+      actualizarBotonAntiguosActivos();
+    }
+    if (filtroAtencionesActivas) filtroAtencionesActivas.style.display = "block";
+    if (lista) lista.style.display = "block";
+
+    if (!atencionesActivasVisible) {
+      map.addLayer(capaAtencionesActivas);
+      atencionesActivasVisible = true;
+    }
+
+    if (capaAtencionesActivas.getLayers().length > 0) {
+      map.fitBounds(capaAtencionesActivas.getBounds().pad(0.15));
+    } else {
+      alert("El Excel se leyó, pero no se encontraron tickets activos con coordenadas válidas.");
+    }
+  } catch (err) {
+    console.error("❌ Error leyendo Excel de activos:", err);
+    if (resumen) resumen.innerHTML = `<span class="text-danger">❌ No se pudo leer el Excel. Verifica que sea el cruce correcto.</span>`;
+    alert("No pude leer el Excel de activos. Revisa que tenga la hoja CRUCE_3_EXCEL y columnas Ticket, Estado, Latitud/Longitud u Coordenadas.");
+  }
+}
+
+function dibujarAtencionesActivas() {
+  capaAtencionesActivas.clearLayers();
+  markersAtencionesActivas = {};
+
+  obtenerAtencionesActivasParaMapa().forEach(item => {
+    const marcador = L.marker([item.lat, item.lon], {
+      icon: crearIconoAtencionActiva(item),
+      title: `Ticket ${item.ticket}`
+    }).bindPopup(crearPopupAtencionActiva(item));
+
+    marcador.on("click", () => {
+      registrarComparacion(item.lat, item.lon, "Ticket", item.ticket);
+    });
+
+    capaAtencionesActivas.addLayer(marcador);
+    markersAtencionesActivas[item.id] = marcador;
+  });
+}
+
+function alternarAtencionesActivas() {
+  if (atencionesActivasData.length === 0) {
+    if (inputActivosExcel) inputActivosExcel.click();
+    return;
+  }
+
+  if (!atencionesActivasVisible) {
+    map.addLayer(capaAtencionesActivas);
+    atencionesActivasVisible = true;
+    if (btnToggleAtencionesActivas) btnToggleAtencionesActivas.textContent = "❌ Ocultar activos en mapa";
+  } else {
+    map.removeLayer(capaAtencionesActivas);
+    atencionesActivasVisible = false;
+    if (btnToggleAtencionesActivas) btnToggleAtencionesActivas.textContent = "👁️ Mostrar activos en mapa";
+  }
+}
+
+function refrescarListaAtencionesActivas() {
+  const lista = document.getElementById("listaAtencionesActivasFiltradas");
+  const filtro = document.getElementById("filtroAtencionesActivas");
+  if (!lista) return;
+
+  const texto = (filtro ? filtro.value : "").trim().toLowerCase();
+  lista.innerHTML = "";
+
+  const baseLista = modoSoloAntiguosActivos
+    ? atencionesActivasData.filter(esAtencionAntigua)
+    : atencionesActivasData;
+
+  const filtradas = ordenarPorMasAntiguos(baseLista.filter(item => {
+    const base = `${item.ticket} ${item.odm} ${item.estadoOdm} ${item.contratista} ${item.alimentador} ${item.sed} ${item.distrito} ${item.suministro} ${item.horaInicio}`.toLowerCase();
+    return !texto || base.includes(texto);
+  }));
+
+  if (filtradas.length === 0) {
+    lista.innerHTML = `<div class="list-group-item text-muted">Sin resultados</div>`;
+    return;
+  }
+
+  filtradas.slice(0, 250).forEach(item => {
+    const color = colorAtencionActiva(item);
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "list-group-item list-group-item-action text-start";
+    const badgeAntiguo = esAtencionAntigua(item)
+      ? `<span class="badge bg-danger ms-1">ANTIGUO</span>`
+      : "";
+
+    btn.innerHTML = `
+      <div><b>${escapeHtml(item.ticket)}</b> <span style="color:${color}; font-weight:700;">●</span>${badgeAntiguo}</div>
+      <div class="small">Inicio: <b>${escapeHtml(item.horaInicio || "—")}</b> · ${escapeHtml(textoAntiguedadActiva(item))}</div>
+      <div class="small">ODM: <b>${escapeHtml(item.odm || "SIN ODM")}</b> · ${escapeHtml(item.estadoOdm || "—")}</div>
+      <div class="small text-muted">${escapeHtml(item.contratista || "—")} · ${escapeHtml(item.distrito || "—")} · ${escapeHtml(item.sed || "—")}</div>
+    `;
+
+    btn.onclick = () => {
+      if (!atencionesActivasVisible) alternarAtencionesActivas();
+      map.setView([item.lat, item.lon], 17, { animate: true });
+      const markerActivo = markersAtencionesActivas[item.id];
+      if (markerActivo) markerActivo.openPopup();
+    };
+
+    lista.appendChild(btn);
+  });
+
+  if (filtradas.length > 250) {
+    const aviso = document.createElement("div");
+    aviso.className = "list-group-item text-muted";
+    aviso.textContent = `Mostrando 250 de ${filtradas.length}. Usa el filtro para precisar.`;
+    lista.appendChild(aviso);
+  }
+}
+
+
+// ============================
+// 🔗 CRUCE 3 ARCHIVOS INTEGRADO PARA GENERAR ACTIVOS DEL MAPA
+// ============================
+const ODM_ACTIVOS_CRUCE = ["ASI", "DES", "INC", "INI", "LLA", "REA"];
+let cruceTicketsRows = [], cruceCallsRows = [], cruceFsmRows = [], cruceResults = [];
+let cruceTicketHeaders = [], cruceCallHeaders = [], cruceFsmHeaders = [];
+let cruceTicketCols = {}, cruceCallCols = {}, cruceFsmCols = {};
+let cruceTicketFileName = "", cruceCallsFileName = "", cruceFsmFileName = "";
+
+function estadoCruce(html, tipo = "") {
+  if (!estadoCruceMapa) return;
+  estadoCruceMapa.innerHTML = `<span class="${tipo ? 'cruce-' + tipo : ''}">${html}</span>`;
+}
+
+function cruceKeyNorm(valor) {
+  return (valor == null ? "" : String(valor))
+    .trim()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[º°ª]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function cruceCompact(valor) {
+  return cruceKeyNorm(valor).replace(/\s+/g, "");
+}
+
+function cruceCleanCode(valor) {
+  if (valor == null) return "";
+  if (typeof valor === "number" && isFinite(valor)) return String(Math.trunc(valor));
+  const s0 = String(valor).trim();
+  const m = s0.match(/\b\d{7,16}\b/);
+  if (m) return m[0];
+  return s0.replace(/[^A-Za-z0-9\-_\/]/g, "").trim();
+}
+
+function cruceCleanPhone(valor) {
+  const s0 = valor == null ? "" : String(valor).trim();
+  if (!s0) return "";
+  const nine = s0.match(/(?:\+?51)?\s*(9\d{8})\b/);
+  if (nine) return nine[1];
+  return s0.replace(/\s+/g, " ");
+}
+
+function cruceParseDateMs(valor) {
+  if (valor instanceof Date) return valor.getTime();
+  if (typeof valor === "number" && isFinite(valor)) return Math.round((valor - 25569) * 86400000);
+  const s0 = valor == null ? "" : String(valor).trim().replace(/\s+/g, " ");
+  if (!s0) return 0;
+  const m = s0.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+  if (m) {
+    let d = +m[1], mo = +m[2] - 1, y = +m[3];
+    if (y < 100) y += 2000;
+    let h = +(m[4] || 0), mi = +(m[5] || 0), se = +(m[6] || 0);
+    const low = s0.toLowerCase();
+    if ((low.includes("p. m") || low.includes("pm")) && h < 12) h += 12;
+    if ((low.includes("a. m") || low.includes("am")) && h === 12) h = 0;
+    return new Date(y, mo, d, h, mi, se).getTime();
+  }
+  const t = Date.parse(s0);
+  return isNaN(t) ? 0 : t;
+}
+
+function crucePickExact(cols, exacts, opts = {}) {
+  for (const e of exacts) {
+    const hit = cols.find(c => cruceCompact(c) === cruceCompact(e) && !(opts.exclude || []).some(ex => cruceKeyNorm(c).includes(cruceKeyNorm(ex))));
+    if (hit) return hit;
+  }
+  return "";
+}
+
+function crucePickCol(cols, groups, opts = {}) {
+  for (const group of groups) {
+    const hit = cols.find(c => group.every(w => cruceKeyNorm(c).includes(cruceKeyNorm(w))) && !(opts.exclude || []).some(ex => cruceKeyNorm(c).includes(cruceKeyNorm(ex))));
+    if (hit) return hit;
+  }
+  return "";
+}
+
+function crucePickTicketColumns(cols) {
+  return {
+    ticket: crucePickExact(cols, ["Ticket"]) || crucePickCol(cols, [["ticket"], ["gesi"], ["caso"]]),
+    estado: crucePickExact(cols, ["Estado"]) || crucePickCol(cols, [["estado", "ticket"], ["estado", "averia"], ["estado"]]),
+    horaInicio: crucePickExact(cols, ["Hora de inicio", "Fecha inicio", "FECHA INICIO"]) || crucePickCol(cols, [["hora", "inicio"], ["fecha", "inicio"], ["createddate"]]),
+    longitud: crucePickExact(cols, ["Longitud"]) || crucePickCol(cols, [["longitud"], ["lon"]]),
+    latitud: crucePickExact(cols, ["Latitud"]) || crucePickCol(cols, [["latitud"], ["lat"]]),
+    sed: crucePickExact(cols, ["SED"]) || crucePickCol(cols, [["sed"]]),
+    alimentador: crucePickExact(cols, ["Alimentador"]) || crucePickCol(cols, [["alimentador"]]),
+    distrito: crucePickExact(cols, ["Distrito"]) || crucePickCol(cols, [["distrito"]]),
+    contratista: crucePickExact(cols, ["Contratista", "Empresa"]) || crucePickCol(cols, [["contratista"], ["empresa"]]),
+    direccion: crucePickExact(cols, ["Dirección", "Direccion"]) || crucePickCol(cols, [["direccion"]]),
+    prioridad: crucePickExact(cols, ["Prioridad"]) || crucePickCol(cols, [["prioridad"]])
+  };
+}
+
+function crucePickCallColumns(cols) {
+  return {
+    ticket: crucePickExact(cols, ["Ticket"]) || crucePickCol(cols, [["ticket"], ["gesi"], ["caso"]]),
+    llamante: crucePickExact(cols, ["Llamante"]) || crucePickCol(cols, [["llamante"]], { exclude: ["tel"] }),
+    telLlamante: crucePickExact(cols, ["Tel. llamante", "Tel llamante"]) || crucePickCol(cols, [["tel", "llamante"], ["telefono", "llamante"], ["celular", "llamante"]]),
+    telefono: crucePickExact(cols, ["Teléfono", "Telefono"]) || crucePickCol(cols, [["telefono"], ["celular"], ["tel"]], { exclude: ["llamante"] }),
+    horaRegistro: crucePickExact(cols, ["Hora de registro"]) || crucePickCol(cols, [["hora", "registro"], ["fecha", "registro"]]),
+    horaAveria: crucePickExact(cols, ["Hora de avería", "Hora de averia"]) || crucePickCol(cols, [["hora", "averia"], ["fecha", "averia"]]),
+    aviso: crucePickExact(cols, ["Aviso"]) || crucePickCol(cols, [["aviso"]]),
+    suministro: crucePickExact(cols, ["Suministro"]) || crucePickCol(cols, [["suministro"]]),
+    direccionContacto: crucePickExact(cols, ["Dirección del contacto", "Direccion del contacto"]) || crucePickCol(cols, [["direccion", "contacto"]]),
+    direccion: crucePickExact(cols, ["Dirección", "Direccion"]) || crucePickCol(cols, [["direccion"]], { exclude: ["contacto"] }),
+    distrito: crucePickExact(cols, ["Distrito"]) || crucePickCol(cols, [["distrito"]]),
+    longitud: crucePickExact(cols, ["Longitud"]) || crucePickCol(cols, [["longitud"], ["lon"]]),
+    latitud: crucePickExact(cols, ["Latitud"]) || crucePickCol(cols, [["latitud"], ["lat"]]),
+    ubicacion: crucePickCol(cols, [["ubicacion"], ["coordenada"], ["coordenadas"]])
+  };
+}
+
+function crucePickFsmColumns(cols) {
+  return {
+    orden: crucePickExact(cols, ["Orden"]) || crucePickCol(cols, [["orden"]], { exclude: ["origen", "sistema"] }),
+    origen: crucePickExact(cols, ["Orden sistema origen"]) || crucePickCol(cols, [["orden", "sistema", "origen"], ["sistema", "origen"], ["orden", "origen"], ["ticket", "origen"]]),
+    estado: crucePickExact(cols, ["Status de usuario"]) || crucePickCol(cols, [["status", "usuario"], ["estado", "usuario"], ["status"], ["estado"]]),
+    responsable: crucePickExact(cols, ["Pto.tbjo.responsable", "Pto. tbjo. responsable"]) || crucePickCol(cols, [["pto", "responsable"], ["responsable"]]),
+    nivel: crucePickExact(cols, ["Nivel Tensión", "Nivel Tension"]) || crucePickCol(cols, [["nivel", "tension"], ["tension"]])
+  };
+}
+
+function cruceHeaderScore(row, profile) {
+  const words = {
+    tickets: ["ticket", "estado", "hora de inicio", "longitud", "latitud", "sed", "alimentador", "prioridad"],
+    calls: ["ticket", "llamante", "tel llamante", "telefono", "aviso", "suministro", "direccion contacto"],
+    fsm: ["orden", "orden sistema origen", "status de usuario", "pto tbjo responsable", "nivel tension"]
+  }[profile] || ["ticket", "estado", "orden"];
+  return (row || []).reduce((a, c) => a + words.some(w => cruceKeyNorm(c).includes(cruceKeyNorm(w))), 0);
+}
+
+function cruceAoaToObjects(aoa, profile) {
+  if (!aoa || !aoa.length) return { headers: [], rows: [] };
+  let best = 0, bestScore = -1;
+  for (let i = 0; i < Math.min(15, aoa.length); i++) {
+    const sc = cruceHeaderScore(aoa[i] || [], profile);
+    if (sc > bestScore) { bestScore = sc; best = i; }
+  }
+  if (bestScore < 1) best = 0;
+  const seen = {};
+  const headers = (aoa[best] || []).map((h, i) => {
+    let name = String(h == null ? "" : h).trim() || ("Col_" + (i + 1));
+    if (seen[name]) { seen[name]++; name = name + "_" + seen[name]; } else seen[name] = 1;
+    return name;
+  });
+  const rows = [];
+  for (let r = best + 1; r < aoa.length; r++) {
+    const arr = aoa[r] || [];
+    if (!arr.some(x => String(x == null ? "" : x).trim())) continue;
+    const obj = {};
+    headers.forEach((h, i) => obj[h] = arr[i] ?? "");
+    rows.push(obj);
+  }
+  return { headers, rows };
+}
+
+async function cruceReadFile(file, profile) {
+  const data = await file.arrayBuffer();
+  const wb = XLSX.read(data, { type: "array", cellDates: true, raw: false, dateNF: "dd/mm/yyyy hh:mm:ss" });
+  const sheetName = wb.SheetNames[0];
+  const ws = wb.Sheets[sheetName];
+  const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "", blankrows: false, raw: false });
+  const parsed = cruceAoaToObjects(aoa, profile);
+  return { sheetName, headers: parsed.headers, rows: parsed.rows };
+}
+
+function cruceFsmTokens(valor) {
+  return (valor == null ? "" : String(valor)).toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9]+/g, " ").trim().split(/\s+/).filter(Boolean);
+}
+
+function cruceFsmIsActive(valor) {
+  const toks = cruceFsmTokens(valor);
+  return toks.some(t => ODM_ACTIVOS_CRUCE.includes(t));
+}
+
+function cruceOrderRank(valor) {
+  const s0 = cruceCleanCode(valor);
+  const m = s0.match(/\d+/);
+  return m ? Number(m[0]) : 0;
+}
+
+function cruceIsRestoredState(valor) {
+  const e = cruceKeyNorm(valor);
+  return e.includes("restaurado") || e.includes("finalizado") || e.includes("cerrado") || e.includes("anulado") || e.includes("cancelado");
+}
+
+function cruceBuildCallsIndex() {
+  const idx = {};
+  cruceCallsRows.forEach((row, i) => {
+    const ticket = cruceCleanCode(cruceCallCols.ticket ? row[cruceCallCols.ticket] : "");
+    if (!ticket) return;
+    const time = Math.max(cruceParseDateMs(cruceCallCols.horaRegistro ? row[cruceCallCols.horaRegistro] : ""), cruceParseDateMs(cruceCallCols.horaAveria ? row[cruceCallCols.horaAveria] : ""));
+    const item = { row, rowIndex: i, time };
+    if (!idx[ticket]) idx[ticket] = [];
+    idx[ticket].push(item);
+  });
+  Object.values(idx).forEach(arr => arr.sort((a, b) => (b.time - a.time) || (b.rowIndex - a.rowIndex)));
+  return idx;
+}
+
+function cruceBuildFsmIndex() {
+  const idx = {};
+  cruceFsmRows.forEach((row, i) => {
+    const origen = cruceCleanCode(cruceFsmCols.origen ? row[cruceFsmCols.origen] : "");
+    if (!origen) return;
+    const orden = cruceCleanCode(cruceFsmCols.orden ? row[cruceFsmCols.orden] : "");
+    const estado = String(cruceFsmCols.estado ? row[cruceFsmCols.estado] : "").trim();
+    const item = { row, rowIndex: i, origen, orden, estado, active: cruceFsmIsActive(estado), rank: cruceOrderRank(orden) };
+    if (!idx[origen]) idx[origen] = [];
+    idx[origen].push(item);
+  });
+  Object.values(idx).forEach(arr => arr.sort((a, b) => (b.rank - a.rank) || (b.rowIndex - a.rowIndex)));
+  return idx;
+}
+
+function cruceBestFsm(matches) {
+  if (!matches || !matches.length) return null;
+  const active = matches.filter(x => x.active);
+  return active.length ? active[0] : matches[0];
+}
+
+function cruceV(row, col) {
+  return col ? String(row[col] == null ? "" : row[col]).trim() : "";
+}
+
+function cruceGetCoordinates(ticketRow, callItem) {
+  const callRow = callItem ? callItem.row : null;
+  const latCall = callRow ? cruceV(callRow, cruceCallCols.latitud) : "";
+  const lonCall = callRow ? cruceV(callRow, cruceCallCols.longitud) : "";
+  const ubiCall = callRow ? cruceV(callRow, cruceCallCols.ubicacion) : "";
+  const latTicket = cruceV(ticketRow, cruceTicketCols.latitud);
+  const lonTicket = cruceV(ticketRow, cruceTicketCols.longitud);
+  if (latCall && lonCall) return latCall + ", " + lonCall;
+  if (ubiCall) return ubiCall;
+  if (latTicket && lonTicket) return latTicket + ", " + lonTicket;
+  return "";
+}
+
+async function leerArchivosCruceSiNecesario() {
+  if (typeof XLSX === "undefined") throw new Error("No cargó la librería XLSX.");
+  const fTickets = cruceTicketsInput && cruceTicketsInput.files[0];
+  const fCalls = cruceCallsInput && cruceCallsInput.files[0];
+  const fFsm = cruceFsmInput && cruceFsmInput.files[0];
+  if (!fTickets || !fCalls || !fFsm) throw new Error("Debes seleccionar los 3 archivos: tickets, llamadas y FSM.");
+
+  cruceTicketFileName = fTickets.name;
+  cruceCallsFileName = fCalls.name;
+  cruceFsmFileName = fFsm.name;
+
+  estadoCruce("Leyendo archivos...", "warn");
+  const [tickets, calls, fsm] = await Promise.all([
+    cruceReadFile(fTickets, "tickets"),
+    cruceReadFile(fCalls, "calls"),
+    cruceReadFile(fFsm, "fsm")
+  ]);
+
+  cruceTicketHeaders = tickets.headers; cruceTicketsRows = tickets.rows; cruceTicketCols = crucePickTicketColumns(cruceTicketHeaders);
+  cruceCallHeaders = calls.headers; cruceCallsRows = calls.rows; cruceCallCols = crucePickCallColumns(cruceCallHeaders);
+  cruceFsmHeaders = fsm.headers; cruceFsmRows = fsm.rows; cruceFsmCols = crucePickFsmColumns(cruceFsmHeaders);
+
+  const faltan = [];
+  if (!cruceTicketCols.ticket) faltan.push("Ticket en tickets");
+  if (!cruceTicketCols.estado) faltan.push("Estado en tickets");
+  if (!cruceCallCols.ticket) faltan.push("Ticket en llamadas");
+  if (!cruceFsmCols.origen) faltan.push("Orden sistema origen en FSM");
+  if (!cruceFsmCols.orden) faltan.push("Orden en FSM");
+  if (!cruceFsmCols.estado) faltan.push("Status de usuario en FSM");
+  if (faltan.length) throw new Error("Columnas no detectadas: " + faltan.join(", "));
+}
+
+function ejecutarCruce3Archivos() {
+  const callsIdx = cruceBuildCallsIndex();
+  const fsmIdx = cruceBuildFsmIndex();
+  cruceResults = [];
+
+  cruceTicketsRows.forEach((t, rowIndex) => {
+    const ticket = cruceCleanCode(cruceTicketCols.ticket ? t[cruceTicketCols.ticket] : "");
+    if (!ticket) return;
+    const estadoTicket = cruceV(t, cruceTicketCols.estado);
+    if (cruceIsRestoredState(estadoTicket)) return;
+
+    const callMatches = callsIdx[ticket] || [];
+    const callItem = callMatches[0] || null;
+    const fsmMatches = fsmIdx[ticket] || [];
+    const fsmItem = cruceBestFsm(fsmMatches);
+    const callRow = callItem ? callItem.row : null;
+    const hasCall = !!callItem;
+    const hasFsm = !!fsmItem;
+    const hasActiveOdm = !!(fsmItem && fsmItem.active);
+    const phone = callRow ? (cruceCleanPhone(cruceV(callRow, cruceCallCols.telLlamante)) || cruceCleanPhone(cruceV(callRow, cruceCallCols.telefono))) : "";
+    const horaLlamada = callRow ? (cruceV(callRow, cruceCallCols.horaRegistro) || cruceV(callRow, cruceCallCols.horaAveria)) : "";
+    const fsmDetail = fsmMatches.slice(0, 8).map(x => (x.orden || "—") + " (" + (x.estado || "—") + ")").join("\n");
+    const horaInicio = cruceV(t, cruceTicketCols.horaInicio);
+
+    cruceResults.push({
+      rowIndex,
+      raw: t,
+      ticket,
+      estadoTicket,
+      horaInicio,
+      hasCall,
+      hasFsm,
+      hasActiveOdm,
+      llamante: callRow ? cruceV(callRow, cruceCallCols.llamante) : "",
+      numeroCelular: phone,
+      telLlamante: callRow ? cruceV(callRow, cruceCallCols.telLlamante) : "",
+      telefonoCliente: callRow ? cruceV(callRow, cruceCallCols.telefono) : "",
+      aviso: callRow ? cruceV(callRow, cruceCallCols.aviso) : "",
+      suministro: callRow ? cruceV(callRow, cruceCallCols.suministro) : "",
+      horaLlamada,
+      direccionContacto: callRow ? (cruceV(callRow, cruceCallCols.direccionContacto) || cruceV(callRow, cruceCallCols.direccion)) : "",
+      distritoLlamada: callRow ? cruceV(callRow, cruceCallCols.distrito) : "",
+      coordenadas: cruceGetCoordinates(t, callItem),
+      latitudBase: cruceV(t, cruceTicketCols.latitud),
+      longitudBase: cruceV(t, cruceTicketCols.longitud),
+      odm: fsmItem ? fsmItem.orden : "",
+      estadoOdm: fsmItem ? fsmItem.estado : "",
+      ptoResponsable: fsmItem ? cruceV(fsmItem.row, cruceFsmCols.responsable) : "",
+      nivelTensionFsm: fsmItem ? cruceV(fsmItem.row, cruceFsmCols.nivel) : "",
+      totalOdmsFsm: fsmMatches.length,
+      detalleOdmsFsm: fsmDetail,
+      sed: cruceV(t, cruceTicketCols.sed),
+      alimentador: cruceV(t, cruceTicketCols.alimentador),
+      distrito: cruceV(t, cruceTicketCols.distrito),
+      contratista: cruceV(t, cruceTicketCols.contratista),
+      direccionTicket: cruceV(t, cruceTicketCols.direccion),
+      prioridad: cruceV(t, cruceTicketCols.prioridad)
+    });
+  });
+
+  return cruceResults;
+}
+
+function resultadoCruceAItemMapa(r, idx) {
+  const f = normalizarFilaExcel({
+    Ticket: r.ticket,
+    Estado: r.estadoTicket,
+    COORDENADAS: r.coordenadas,
+    LATITUD_BASE: r.latitudBase,
+    LONGITUD_BASE: r.longitudBase,
+    ODM: r.odm,
+    ESTADO_ODM: r.estadoOdm,
+    ODM_ACTIVA: r.hasActiveOdm ? "SI" : "NO",
+    DETALLE_ODMS_FSM: r.detalleOdmsFsm,
+    CONTRATISTA: r.contratista || r.ptoResponsable,
+    Alimentador: r.alimentador,
+    SED: r.sed,
+    Distrito: r.distrito || r.distritoLlamada,
+    SUMINISTRO_LLAMADA: r.suministro,
+    DIRECCION_CONTACTO: r.direccionContacto || r.direccionTicket,
+    "Hora de inicio": r.horaInicio
+  });
+  const item = convertirFilaActiva(f, idx);
+  item.llamante = r.llamante;
+  item.numeroCelular = r.numeroCelular;
+  item.aviso = r.aviso;
+  item.horaLlamada = r.horaLlamada;
+  item.ptoResponsable = r.ptoResponsable;
+  item.nivelTensionFsm = r.nivelTensionFsm;
+  return item;
+}
+
+function aplicarAtencionesActivasEnMapa(items, origen = "data online", totalOriginal = null) {
+  atencionesActivasData = ordenarPorMasAntiguos((items || []).filter(x => x.ticket && !isNaN(x.lat) && !isNaN(x.lon) && esTicketActivoExcel(x.estadoTicket)));
+  modoSoloAntiguosActivos = false;
+  actualizarBotonAntiguosActivos();
+  nombreArchivoAtencionesActivas = origen;
+  dibujarAtencionesActivas();
+  refrescarListaAtencionesActivas();
+
+  const resumen = document.getElementById("resumenAtencionesActivas");
+  const lista = document.getElementById("listaAtencionesActivasFiltradas");
+  const total = totalOriginal == null ? atencionesActivasData.length : totalOriginal;
+  const conOdm = atencionesActivasData.filter(x => x.odmActiva).length;
+  const sinOdm = atencionesActivasData.filter(x => !x.odm).length;
+  const antiguos = atencionesActivasData.filter(esAtencionAntigua).length;
+  const masAntiguo = atencionesActivasData.find(x => x.fechaInicioMs);
+  const textoMasAntiguo = masAntiguo
+    ? `<br><span class="text-danger">🕘 Más antiguo: ${escapeHtml(masAntiguo.ticket)} · ${escapeHtml(masAntiguo.horaInicio)} · ${escapeHtml(textoAntiguedadActiva(masAntiguo))}</span>`
+    : "";
+
+  if (resumen) {
+    resumen.innerHTML = `✅ <b>${atencionesActivasData.length}</b> activos con coordenadas cargados<br>
+      <span class="text-muted">Origen: ${escapeHtml(origen)}</span><br>
+      <span class="text-danger">${antiguos} antiguos (&gt; ${HORAS_ANTIGUO_ACTIVO} h, pintados rojo)</span> ·
+      <span class="text-success">${conOdm} con ODM activa</span> ·
+      <span class="text-warning">${sinOdm} sin ODM/FSM</span> ·
+      <span class="text-muted">${Math.max(0, total - atencionesActivasData.length)} filtrados/sin coordenadas</span>${textoMasAntiguo}`;
+  }
+
+  if (btnToggleAtencionesActivas) {
+    btnToggleAtencionesActivas.style.display = "block";
+    btnToggleAtencionesActivas.textContent = atencionesActivasVisible ? "❌ Ocultar activos en mapa" : "👁️ Mostrar activos en mapa";
+  }
+  if (btnVerAntiguosActivos) {
+    btnVerAntiguosActivos.style.display = "block";
+    actualizarBotonAntiguosActivos();
+  }
+  if (filtroAtencionesActivas) filtroAtencionesActivas.style.display = "block";
+  if (lista) lista.style.display = "block";
+
+  if (!atencionesActivasVisible) {
+    map.addLayer(capaAtencionesActivas);
+    atencionesActivasVisible = true;
+    if (btnToggleAtencionesActivas) btnToggleAtencionesActivas.textContent = "❌ Ocultar activos en mapa";
+  }
+
+  if (capaAtencionesActivas.getLayers().length > 0) {
+    map.fitBounds(capaAtencionesActivas.getBounds().pad(0.15));
+  }
+}
+
+async function cruzar3ArchivosYPintarMapa() {
+  try {
+    if (btnCruzar3ArchivosMapa) {
+      btnCruzar3ArchivosMapa.disabled = true;
+      btnCruzar3ArchivosMapa.textContent = "⏳ Cruzando...";
+    }
+    await leerArchivosCruceSiNecesario();
+    const resultados = ejecutarCruce3Archivos();
+    const items = ordenarPorMasAntiguos(resultados.map(resultadoCruceAItemMapa));
+    aplicarAtencionesActivasEnMapa(items, "Cruce 3 archivos", resultados.length);
+
+    const observados = resultados.filter(r => !r.hasCall || !r.hasActiveOdm).length;
+    const conCoord = atencionesActivasData.length;
+    estadoCruce(`✅ Cruce listo: ${resultados.length} tickets evaluados · ${conCoord} pintados · ${observados} observados`, "ok");
+
+    if (btnExportarCruceMapaExcel) btnExportarCruceMapaExcel.style.display = "block";
+    if (btnExportarActivosJsonRepo) btnExportarActivosJsonRepo.style.display = "block";
+  } catch (err) {
+    console.error("❌ Error en cruce integrado:", err);
+    estadoCruce("❌ " + escapeHtml(err.message || err), "err");
+    alert(err.message || "No se pudo cruzar los archivos.");
+  } finally {
+    if (btnCruzar3ArchivosMapa) {
+      btnCruzar3ArchivosMapa.disabled = false;
+      btnCruzar3ArchivosMapa.textContent = "🔍 Cruzar y pintar mapa";
+    }
+  }
+}
+
+function cruceExcelHeaders() {
+  return [
+    ...cruceTicketHeaders,
+    "CRUCE_LLAMADA", "LLAMANTE", "NUMERO_CELULAR", "TEL_LLAMANTE", "TELEFONO_CLIENTE", "AVISO_LLAMADA", "SUMINISTRO_LLAMADA", "HORA_LLAMADA", "DIRECCION_CONTACTO", "DISTRITO_LLAMADA", "COORDENADAS", "LATITUD_BASE", "LONGITUD_BASE",
+    "CRUCE_ODM", "ODM", "ESTADO_ODM", "ODM_ACTIVA", "PTO_TBJO_RESPONSABLE", "NIVEL_TENSION_FSM", "TOTAL_ODMS_FSM", "DETALLE_ODMS_FSM"
+  ];
+}
+
+function cruceRowsParaExportar() {
+  const headers = cruceExcelHeaders();
+  const data = [headers];
+  cruceResults.forEach(r => {
+    const base = cruceTicketHeaders.map(h => r.raw[h] ?? "");
+    const extra = [
+      r.hasCall ? "CON LLAMADA" : "SIN LLAMADA", r.llamante, r.numeroCelular, r.telLlamante, r.telefonoCliente, r.aviso, r.suministro, r.horaLlamada, r.direccionContacto, r.distritoLlamada, r.coordenadas, r.latitudBase, r.longitudBase,
+      r.hasActiveOdm ? "CON ODM ACTIVA" : (r.hasFsm ? "ODM NO ACTIVA" : "SIN REGISTRO FSM"), r.odm, r.estadoOdm, r.hasActiveOdm ? "SI" : "NO", r.ptoResponsable, r.nivelTensionFsm, r.totalOdmsFsm, r.detalleOdmsFsm
+    ];
+    data.push([...base, ...extra]);
+  });
+  return data;
+}
+
+function exportarCruceMapaExcel() {
+  if (!cruceResults.length) {
+    alert("Primero genera el cruce 3 archivos.");
+    return;
+  }
+  const wb = XLSX.utils.book_new();
+  const data = cruceRowsParaExportar();
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  ws["!cols"] = data[0].map(h => ({ wch: Math.min(Math.max(String(h).length + 2, 12), 34) }));
+  XLSX.utils.book_append_sheet(wb, ws, "CRUCE_3_EXCEL");
+  const resumen = [
+    ["Métrica", "Valor"],
+    ["Archivo tickets", cruceTicketFileName], ["Archivo llamadas", cruceCallsFileName], ["Archivo FSM", cruceFsmFileName],
+    ["Tickets evaluados", cruceResults.length], ["Pintados en mapa", atencionesActivasData.length],
+    ["Con llamada", cruceResults.filter(r => r.hasCall).length], ["Sin llamada", cruceResults.filter(r => !r.hasCall).length],
+    ["Con ODM activa", cruceResults.filter(r => r.hasActiveOdm).length], ["Sin ODM activa", cruceResults.filter(r => !r.hasActiveOdm).length]
+  ];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(resumen), "RESUMEN");
+  XLSX.writeFile(wb, "Cruce_3_Excel_Tickets_Llamadas_FSM.xlsx");
+}
+
+function activosParaJsonRepositorio() {
+  return {
+    generado: new Date().toISOString(),
+    fuente: "Cruce 3 archivos",
+    total: atencionesActivasData.length,
+    horasAntiguo: HORAS_ANTIGUO_ACTIVO,
+    archivos: {
+      tickets: cruceTicketFileName || nombreArchivoAtencionesActivas || "",
+      llamadas: cruceCallsFileName || "",
+      fsm: cruceFsmFileName || ""
+    },
+    activos: atencionesActivasData.map(x => ({
+      id: x.id, ticket: x.ticket, estadoTicket: x.estadoTicket,
+      lat: x.lat, lon: x.lon,
+      odm: x.odm, estadoOdm: x.estadoOdm, odmActiva: !!x.odmActiva,
+      odmActivaTxt: x.odmActivaTxt || (x.odmActiva ? "SI" : "NO"), detalleOdms: x.detalleOdms || "",
+      contratista: x.contratista || "", alimentador: x.alimentador || "", sed: x.sed || "", distrito: x.distrito || "",
+      suministro: x.suministro || "", direccion: x.direccion || "",
+      horaInicio: x.horaInicio || "", fechaInicioMs: x.fechaInicioMs || null,
+      llamante: x.llamante || "", numeroCelular: x.numeroCelular || "", aviso: x.aviso || "", horaLlamada: x.horaLlamada || "",
+      ptoResponsable: x.ptoResponsable || "", nivelTensionFsm: x.nivelTensionFsm || ""
+    }))
+  };
+}
+
+function descargarBlobTexto(nombre, texto, tipo = "application/json;charset=utf-8") {
+  const blob = new Blob([texto], { type: tipo });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = nombre;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function exportarActivosJsonRepositorio() {
+  if (!atencionesActivasData.length) {
+    alert("Primero carga o genera atenciones activas.");
+    return;
+  }
+  descargarBlobTexto("activos_mapa.json", JSON.stringify(activosParaJsonRepositorio(), null, 2));
+  estadoCruce("✅ JSON descargado. Súbelo al repo en data/activos_mapa.json para carga online automática.", "ok");
+}
+
+function itemDesdeJsonOnline(x, idx) {
+  const fecha = x.fechaInicioMs ? new Date(Number(x.fechaInicioMs)) : parsearFechaInicioActiva(x.horaInicio);
+  return {
+    id: x.id || x.ticket || `online_${idx + 1}`,
+    ticket: limpiarTextoExcel(x.ticket),
+    estadoTicket: limpiarTextoExcel(x.estadoTicket),
+    lat: parseFloat(x.lat),
+    lon: parseFloat(x.lon),
+    odm: limpiarTextoExcel(x.odm),
+    estadoOdm: limpiarTextoExcel(x.estadoOdm),
+    odmActiva: !!x.odmActiva,
+    odmActivaTxt: limpiarTextoExcel(x.odmActivaTxt),
+    detalleOdms: limpiarTextoExcel(x.detalleOdms),
+    contratista: limpiarTextoExcel(x.contratista),
+    alimentador: limpiarTextoExcel(x.alimentador),
+    sed: limpiarTextoExcel(x.sed),
+    distrito: limpiarTextoExcel(x.distrito),
+    suministro: normalizarCliente(x.suministro),
+    direccion: limpiarTextoExcel(x.direccion),
+    horaInicio: x.horaInicio ? limpiarTextoExcel(x.horaInicio) : formatearFechaInicioActiva("", fecha),
+    fechaInicioMs: fecha && !isNaN(fecha.getTime()) ? fecha.getTime() : null,
+    llamante: limpiarTextoExcel(x.llamante),
+    numeroCelular: limpiarTextoExcel(x.numeroCelular),
+    aviso: limpiarTextoExcel(x.aviso),
+    horaLlamada: limpiarTextoExcel(x.horaLlamada),
+    ptoResponsable: limpiarTextoExcel(x.ptoResponsable),
+    nivelTensionFsm: limpiarTextoExcel(x.nivelTensionFsm),
+    filaExcel: idx + 1
+  };
+}
+
+async function cargarActivosOnlineSiExiste() {
+  try {
+    const resp = await fetch("data/activos_mapa.json", { cache: "no-store" });
+    if (!resp.ok) return;
+    const json = await resp.json();
+    const items = Array.isArray(json) ? json.map(itemDesdeJsonOnline) : (json.activos || []).map(itemDesdeJsonOnline);
+    if (!items.length) return;
+    aplicarAtencionesActivasEnMapa(items, "data/activos_mapa.json", items.length);
+    estadoCruce(`🌐 Activos online cargados: ${items.length}.`, "ok");
+    if (btnExportarActivosJsonRepo) btnExportarActivosJsonRepo.style.display = "block";
+  } catch (err) {
+    console.log("No hay activos online o no se pudo leer data/activos_mapa.json", err);
+  }
+}
+
+// Si publicas data/activos_mapa.json en GitHub Pages, el mapa lo cargará solo.
+cargarActivosOnlineSiExiste();
+
+
 // --- FUNCIONES ---
 async function mostrarAtenciones(clienteID) {
   const lista = document.getElementById("listaAtenciones");
