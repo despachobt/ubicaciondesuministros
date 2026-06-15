@@ -271,30 +271,17 @@ input[type=range] {
 
   <div class="card mb-3">
     <div class="card-body p-2">
-      <h6 class="mb-2">🧾 Atenciones activas</h6>
+      <h6 class="mb-2">🔎 Filtrar activos</h6>
 
-      <button id="btnCargarActivosExcel" class="btn btn-dark btn-sm w-100 mb-2">
-        📂 Cargar Excel de activos
-      </button>
-      <input type="file" id="inputActivosExcel" accept=".xlsx,.xls" style="display:none;">
-
-      <button id="btnToggleAtencionesActivas" class="btn btn-outline-dark btn-sm w-100 mb-2" style="display:none;">
-        👁️ Mostrar activos en mapa
-      </button>
-
-      <button id="btnVerAntiguosActivos" class="btn btn-outline-danger btn-sm w-100 mb-2" style="display:none;">
-        🕘 Ver más antiguos
-      </button>
-
-      <input type="text" id="filtroAtencionesActivas" class="form-control form-control-sm mb-2" style="display:none;"
-             placeholder="Filtrar ticket, ODM, distrito, contratista, inicio">
+      <input type="text" id="filtroAtencionesActivas" class="form-control form-control-sm mb-2"
+             placeholder="Filtrar por ticket, ODM, distrito, contratista, SED o inicio">
 
       <div id="resumenAtencionesActivas" class="small text-muted mb-2">
-        Carga tu cruce Excel para pintar tickets activos con ODM.
+        Los activos se cargan desde el cruce de 3 archivos o desde <b>data/activos_mapa.json</b>.
       </div>
 
       <div id="listaAtencionesActivasFiltradas" class="list-group small"
-           style="display:none; max-height:220px; overflow-y:auto;"></div>
+           style="max-height:260px; overflow-y:auto;"></div>
     </div>
   </div>
 
@@ -410,10 +397,10 @@ const btnTecnicos = document.getElementById("btnTecnicos");
 // ============================
 // 📂 BOTONES ATENCIONES ACTIVAS DESDE EXCEL
 // ============================
-const btnCargarActivosExcel = document.getElementById("btnCargarActivosExcel");
-const inputActivosExcel = document.getElementById("inputActivosExcel");
-const btnToggleAtencionesActivas = document.getElementById("btnToggleAtencionesActivas");
-const btnVerAntiguosActivos = document.getElementById("btnVerAntiguosActivos");
+const btnCargarActivosExcel = null;
+const inputActivosExcel = null;
+const btnToggleAtencionesActivas = null;
+const btnVerAntiguosActivos = null;
 const filtroAtencionesActivas = document.getElementById("filtroAtencionesActivas");
 
 const cruceTicketsInput = document.getElementById("cruceTicketsInput");
@@ -423,24 +410,6 @@ const btnCruzar3ArchivosMapa = document.getElementById("btnCruzar3ArchivosMapa")
 const btnExportarCruceMapaExcel = document.getElementById("btnExportarCruceMapaExcel");
 const btnExportarActivosJsonRepo = document.getElementById("btnExportarActivosJsonRepo");
 const estadoCruceMapa = document.getElementById("estadoCruceMapa");
-
-if (btnCargarActivosExcel && inputActivosExcel) {
-  btnCargarActivosExcel.addEventListener("click", () => {
-    inputActivosExcel.click();
-  });
-}
-
-if (inputActivosExcel) {
-  inputActivosExcel.addEventListener("change", async (ev) => {
-    const archivo = ev.target.files && ev.target.files[0];
-    if (!archivo) return;
-
-    await cargarAtencionesActivasDesdeExcel(archivo);
-
-    // Permite volver a cargar el mismo archivo si lo seleccionas otra vez.
-    ev.target.value = "";
-  });
-}
 
 if (btnToggleAtencionesActivas) {
   btnToggleAtencionesActivas.addEventListener("click", alternarAtencionesActivas);
@@ -453,6 +422,10 @@ if (btnVerAntiguosActivos) {
 if (filtroAtencionesActivas) {
   filtroAtencionesActivas.addEventListener("input", refrescarListaAtencionesActivas);
 }
+// Mensaje inicial del buscador de activos.
+setTimeout(() => {
+  if (!atencionesActivasData.length) refrescarListaAtencionesActivas();
+}, 0);
 
 
 if (btnCruzar3ArchivosMapa) {
@@ -1489,13 +1462,11 @@ function esOdmActivaExcel(odmActiva, estadoOdm) {
   const v = normalizarCabeceraExcel(odmActiva).replace(/_/g, " ");
   const e = normalizarCabeceraExcel(estadoOdm).replace(/_/g, " ");
 
-  // REA se considera cerrada, no activa. También se tratan como no activas las anuladas/canceladas/cerradas.
-  if (["REA", "CAN", "FIN", "CER", "CERRADO", "CERRADA"].includes(e) || e.includes("ANU") || e.includes("ANUL") || e.includes("CANCEL")) return false;
+  // REA es ODM cerrada: debe ganar incluso si un archivo antiguo trae ODM_ACTIVA = SI.
+  if (e === "REA" || e.includes("REA ") || e.includes("CERR") || e.includes("CAN") || e.includes("ANU") || e.includes("ANUL")) return false;
   if (["ASI", "DES", "INC", "INI", "LLA"].includes(e)) return true;
-
-  // Si el estado no vino claro, recién se usa la columna ODM_ACTIVA como respaldo.
+  if (["NO", "FALSE", "FALSO", "0", "INACTIVA", "INACTIVO"].includes(v)) return false;
   if (["SI", "S", "TRUE", "VERDADERO", "1", "ACTIVA", "ACTIVO"].includes(v)) return true;
-  if (["NO", "FALSE", "FALSO", "0", "INACTIVA", "INACTIVO", "CERRADA", "CERRADO"].includes(v)) return false;
 
   return false;
 }
@@ -1598,16 +1569,10 @@ function alternarVistaAntiguosActivos() {
   }
 }
 
-function esOdmCerrada(item) {
-  const e = normalizarCabeceraExcel(item && item.estadoOdm).replace(/_/g, " ");
-  return ["REA", "CAN", "FIN", "CER", "CERRADO", "CERRADA"].includes(e) || e.includes("ANU") || e.includes("ANUL") || e.includes("CANCEL");
-}
-
 function colorAtencionActiva(item) {
   if (esAtencionAntigua(item)) return "#dc3545"; // rojo: ticket antiguo
   if (!item.odm) return "#fd7e14";               // naranja: sin ODM/FSM
   if (item.odmActiva) return "#198754";          // verde: ODM activa
-  if (esOdmCerrada(item)) return "#6c757d";      // gris: ODM cerrada (REA/CAN/etc.)
   return "#ffc107";                              // amarillo: ODM no activa / revisar
 }
 
@@ -1629,12 +1594,10 @@ function crearIconoAtencionActiva(item) {
 function badgeOdmActiva(item) {
   if (!item.odm) return `<span class="badge bg-danger">Sin ODM/FSM</span>`;
   if (item.odmActiva) return `<span class="badge bg-success">ODM activa</span>`;
-  if (esOdmCerrada(item)) return `<span class="badge bg-secondary">ODM cerrada</span>`;
   return `<span class="badge bg-warning text-dark">Revisar ODM</span>`;
 }
 
 function crearPopupAtencionActiva(item) {
-  const textoBreve = item.textoBreveOdm ? `<br><b>Texto breve ODM:</b> ${escapeHtml(item.textoBreveOdm)}` : "";
   const detalle = item.detalleOdms ? `<hr class="my-2"><div style="max-height:120px; overflow:auto;"><b>Detalle FSM:</b><br>${escapeHtml(item.detalleOdms).replace(/\n/g, "<br>")}</div>` : "";
 
   return `
@@ -1644,10 +1607,12 @@ function crearPopupAtencionActiva(item) {
       <b>Hora de inicio:</b> ${escapeHtml(item.horaInicio || "—")}<br>
       <b>Antigüedad:</b> <span style="color:${esAtencionAntigua(item) ? '#dc3545' : '#6c757d'}; font-weight:700;">${escapeHtml(textoAntiguedadActiva(item))}</span><br>
       <b>Última ODM:</b> ${escapeHtml(item.odm || "SIN ODM")}<br>
-      <b>Estado última ODM:</b> ${escapeHtml(item.estadoOdm || "—")}${textoBreve}<br>
+      <b>Estado última ODM:</b> ${escapeHtml(item.estadoOdm || "—")}<br>
       <b>Validación:</b> ${badgeOdmActiva(item)}<br>
+      <b>Tipo resumen:</b> ${escapeHtml(item.tipoResumen || obtenerTipoResumenAtencion(item.textoBreveOdm, item.objetoTecnico) || "—")}<br>
+      ${item.objetoTecnico ? `<b>Objeto técnico:</b> ${escapeHtml(item.objetoTecnico)}<br>` : ""}
       <hr class="my-2">
-      <b>Contratista:</b> ${escapeHtml(item.contratista || "—")}<br>
+      <b>Contratista SET:</b> ${escapeHtml(item.contratistaSet || item.contratista || "—")}<br>
       <b>Alimentador:</b> ${escapeHtml(item.alimentador || "—")}<br>
       <b>SED:</b> ${escapeHtml(item.sed || "—")}<br>
       <b>Distrito:</b> ${escapeHtml(item.distrito || "—")}<br>
@@ -1667,7 +1632,6 @@ function convertirFilaActiva(filaOriginal, idx) {
   const estadoOdm = limpiarTextoExcel(obtenerCampoExcel(f, ["ESTADO_ODM", "Estado ODM", "ESTADO ORDEN", "Estado Orden"]));
   const odmActivaTxt = limpiarTextoExcel(obtenerCampoExcel(f, ["ODM_ACTIVA", "ODM ACTIVA", "ODM_Activa"]));
   const detalleOdms = limpiarTextoExcel(obtenerCampoExcel(f, ["DETALLE_ODMS_FSM", "Detalle ODMS FSM", "DETALLE ODM", "DETALLE_ODM"]));
-  const textoBreveOdm = limpiarTextoExcel(obtenerCampoExcel(f, ["TEXTO_BREVE_FSM", "Texto breve FSM", "Texto breve", "TEXTO BREVE", "TEXTO_BREVE", "DESCRIPCION_ODM", "Descripción ODM", "Descripcion ODM"]));
   const horaInicioRaw = obtenerCampoExcel(f, ["Hora de inicio", "HORA DE INICIO", "HORA_INICIO", "Fecha inicio", "FECHA_INICIO", "FECHA INICIO", "CreatedDate", "CREATEDDATE"]);
   const fechaInicio = parsearFechaInicioActiva(horaInicioRaw);
 
@@ -1682,8 +1646,10 @@ function convertirFilaActiva(filaOriginal, idx) {
     odmActiva: esOdmActivaExcel(odmActivaTxt, estadoOdm),
     odmActivaTxt,
     detalleOdms,
-    textoBreveOdm,
-    contratista: limpiarTextoExcel(obtenerCampoExcel(f, ["CONTRATISTA", "Contratista", "EMPRESA"])),
+    contratista: limpiarTextoExcel(obtenerCampoExcel(f, ["CONTRATISTA_SET", "Contratista SET", "CONTRATISTA", "Contratista", "EMPRESA"])),
+    contratistaSet: limpiarTextoExcel(obtenerCampoExcel(f, ["CONTRATISTA_SET", "Contratista SET"])),
+    objetoTecnico: limpiarTextoExcel(obtenerCampoExcel(f, ["OBJETO_TECNICO", "Objeto técnico", "Objeto tecnico", "OBJETO TECNICO"])),
+    tipoResumen: limpiarTextoExcel(obtenerCampoExcel(f, ["TIPO_RESUMEN", "Tipo resumen", "CLASIFICACION", "Clasificación", "Clasificacion"])),
     alimentador: limpiarTextoExcel(obtenerCampoExcel(f, ["Alimentador", "ALIMENTADOR", "Alimentador_2", "Cód. alimentador", "Cod alimentador"])),
     sed: limpiarTextoExcel(obtenerCampoExcel(f, ["SED"])),
     distrito: limpiarTextoExcel(obtenerCampoExcel(f, ["Distrito", "DISTRITO", "DISTRITO_LLAMADA"])),
@@ -1716,7 +1682,13 @@ async function cargarAtencionesActivasDesdeExcel(archivo) {
 
     const convertidas = ordenarPorMasAntiguos(filas
       .map(convertirFilaActiva)
-      .filter(x => x.ticket && !isNaN(x.lat) && !isNaN(x.lon) && esTicketActivoExcel(x.estadoTicket)));
+      .filter(x => x.ticket && !isNaN(x.lat) && !isNaN(x.lon) && esTicketActivoExcel(x.estadoTicket))
+      .map(x => {
+        x.contratistaSet = x.contratistaSet || x.contratista || resolverContratistaPorSet("", x.alimentador, x.ptoResponsable, x.contratista);
+        x.contratista = x.contratistaSet || x.contratista;
+        x.tipoResumen = x.tipoResumen || obtenerTipoResumenAtencion(x.textoBreveOdm, x.objetoTecnico);
+        return x;
+      }));
 
     atencionesActivasData = convertidas;
     modoSoloAntiguosActivos = false;
@@ -1815,12 +1787,17 @@ function refrescarListaAtencionesActivas() {
   const texto = (filtro ? filtro.value : "").trim().toLowerCase();
   lista.innerHTML = "";
 
+  if (!atencionesActivasData.length) {
+    lista.innerHTML = `<div class="list-group-item text-muted">Aún no hay activos cargados. Usa <b>Cruce 3 archivos</b> o sube <b>data/activos_mapa.json</b> al repositorio.</div>`;
+    return;
+  }
+
   const baseLista = modoSoloAntiguosActivos
     ? atencionesActivasData.filter(esAtencionAntigua)
     : atencionesActivasData;
 
   const filtradas = ordenarPorMasAntiguos(baseLista.filter(item => {
-    const base = `${item.ticket} ${item.odm} ${item.estadoOdm} ${item.textoBreveOdm || ""} ${item.contratista} ${item.alimentador} ${item.sed} ${item.distrito} ${item.suministro} ${item.horaInicio}`.toLowerCase();
+    const base = `${item.ticket} ${item.odm} ${item.estadoOdm} ${item.textoBreveOdm || ""} ${item.tipoResumen || ""} ${item.objetoTecnico || ""} ${item.contratistaSet || ""} ${item.contratista} ${item.alimentador} ${item.sed} ${item.distrito} ${item.suministro} ${item.horaInicio}`.toLowerCase();
     return !texto || base.includes(texto);
   }));
 
@@ -1843,7 +1820,8 @@ function refrescarListaAtencionesActivas() {
       <div class="small">Inicio: <b>${escapeHtml(item.horaInicio || "—")}</b> · ${escapeHtml(textoAntiguedadActiva(item))}</div>
       <div class="small">ODM: <b>${escapeHtml(item.odm || "SIN ODM")}</b> · ${escapeHtml(item.estadoOdm || "—")}</div>
       ${item.textoBreveOdm ? `<div class="small text-muted">📝 ${escapeHtml(item.textoBreveOdm)}</div>` : ""}
-      <div class="small text-muted">${escapeHtml(item.contratista || "—")} · ${escapeHtml(item.distrito || "—")} · ${escapeHtml(item.sed || "—")}</div>
+      <div class="small text-muted">📌 ${escapeHtml(item.tipoResumen || obtenerTipoResumenAtencion(item.textoBreveOdm, item.objetoTecnico) || "SIN CLASIFICAR")}</div>
+      <div class="small text-muted">${escapeHtml(item.contratistaSet || item.contratista || "—")} · ${escapeHtml(item.distrito || "—")} · ${escapeHtml(item.sed || "—")}</div>
     `;
 
     btn.onclick = () => {
@@ -1953,11 +1931,13 @@ function crucePickTicketColumns(cols) {
     horaInicio: crucePickExact(cols, ["Hora de inicio", "Fecha inicio", "FECHA INICIO"]) || crucePickCol(cols, [["hora", "inicio"], ["fecha", "inicio"], ["createddate"]]),
     longitud: crucePickExact(cols, ["Longitud"]) || crucePickCol(cols, [["longitud"], ["lon"]]),
     latitud: crucePickExact(cols, ["Latitud"]) || crucePickCol(cols, [["latitud"], ["lat"]]),
+    set: crucePickExact(cols, ["SET", "SE", "Subestación", "Subestacion"]) || crucePickCol(cols, [["subestacion"], ["set"]], { exclude: ["sed"] }),
     sed: crucePickExact(cols, ["SED"]) || crucePickCol(cols, [["sed"]]),
-    alimentador: crucePickExact(cols, ["Alimentador"]) || crucePickCol(cols, [["alimentador"]]),
+    alimentador: crucePickExact(cols, ["Alimentador"]) || crucePickCol(cols, [["alimentador"], ["linea"]]),
     distrito: crucePickExact(cols, ["Distrito"]) || crucePickCol(cols, [["distrito"]]),
     contratista: crucePickExact(cols, ["Contratista", "Empresa"]) || crucePickCol(cols, [["contratista"], ["empresa"]]),
     direccion: crucePickExact(cols, ["Dirección", "Direccion"]) || crucePickCol(cols, [["direccion"]]),
+    objetoTecnico: crucePickExact(cols, ["Objeto técnico", "Objeto tecnico", "Objeto Técnico", "OBJETO_TECNICO"]) || crucePickCol(cols, [["objeto", "tecnico"], ["tipo", "equipo"], ["equipo", "probable"]]),
     prioridad: crucePickExact(cols, ["Prioridad"]) || crucePickCol(cols, [["prioridad"]])
   };
 }
@@ -1996,7 +1976,7 @@ function cruceHeaderScore(row, profile) {
   const words = {
     tickets: ["ticket", "estado", "hora de inicio", "longitud", "latitud", "sed", "alimentador", "prioridad"],
     calls: ["ticket", "llamante", "tel llamante", "telefono", "aviso", "suministro", "direccion contacto"],
-    fsm: ["orden", "orden sistema origen", "status de usuario", "pto tbjo responsable", "nivel tension"]
+    fsm: ["orden", "orden sistema origen", "status de usuario", "texto breve", "pto tbjo responsable", "nivel tension"]
   }[profile] || ["ticket", "estado", "orden"];
   return (row || []).reduce((a, c) => a + words.some(w => cruceKeyNorm(c).includes(cruceKeyNorm(w))), 0);
 }
@@ -2056,6 +2036,135 @@ function cruceIsRestoredState(valor) {
   return e.includes("restaurado") || e.includes("finalizado") || e.includes("cerrado") || e.includes("anulado") || e.includes("cancelado");
 }
 
+
+function normalizarContratistaResumen(valor) {
+  const t = cruceKeyNorm(valor).toUpperCase();
+  if (!t) return "SIN ASIGNAR";
+  if (t.includes("DOM") || t.includes("DOMINION")) return "DOMINION";
+  if (t.includes("COB") || t.includes("COBRA")) return "COBRA";
+  if (t.includes("LAR") || t.includes("LARI")) return "LARI";
+  if (t === "PA" || t.includes("PAP") || t.includes("P A") || t.includes("P.A")) return "PA";
+  if (t.includes("INM") || t.includes("INMEL") || t.includes("NORTE")) return "INMEL";
+  if (["INMEL", "PA", "COBRA", "DOMINION", "LARI"].includes(t)) return t;
+  return t || "SIN ASIGNAR";
+}
+
+function normalizarClaveSet(valor) {
+  return cruceKeyNorm(valor).toUpperCase().replace(/\s+/g, " ");
+}
+
+const contratistaPorSetResponsabilidad = {
+  "ANCON":"COBRA", "ANDAHUASI":"INMEL", "ARICA":"INMEL", "AUCALLAMA":"INMEL", "BARRANCA":"INMEL",
+  "BARSI":"DOMINION", "CANTA":"COBRA", "CTO GRANDE":"LARI", "CANTO GRANDE":"LARI", "CAUDIVILLA":"COBRA", "CAUDEVILLA":"COBRA",
+  "CHANCAY":"INMEL", "CHAVARRIA":"DOMINION", "CHILLON":"DOMINION", "COMAS":"COBRA", "CUSCO":"PA",
+  "FILADELFIA":"DOMINION", "HOYOS ACOS":"INMEL", "HUACHO":"INMEL", "HUAURA":"INMEL", "HUANDOY":"COBRA",
+  "HUARAL":"INMEL", "HUARANGAL":"COBRA", "HUINCO 1":"DOMINION", "HUINCO 2":"DOMINION", "INDUSTRIAL":"DOMINION",
+  "INFANTAS":"COBRA", "IZAGUIRRE":"LARI", "JICAMARCA":"LARI", "JOSE GRANDA":"LARI", "MALVINAS":"PA",
+  "MARANGA":"DOMINION", "MARIATEGUI":"LARI", "MED MUNDO":"INMEL", "MED.MUNDO":"INMEL", "MEDIO MUNDO":"INMEL",
+  "MIRADOR":"LARI", "MIRONES":"PA", "NARANJAL":"LARI", "NAVA":"INMEL", "OQUENDO":"DOMINION",
+  "PANDO":"PA", "PERSHING":"PA", "PT PIEDRA":"COBRA", "PT-PIEDRA":"COBRA", "RAVIRA":"INMEL",
+  "SANTA LEONOR":"INMEL", "STA MARINA":"DOMINION", "STA-MARINA":"DOMINION", "STA ROSA A":"LARI", "STA.ROSA A":"LARI", "STA.ROSA_A":"LARI",
+  "SUPE":"INMEL", "TACNA":"PA", "T VALLE":"DOMINION", "T-VALLE":"DOMINION", "UNI":"LARI", "VENTANILLA":"COBRA",
+  "ZAPALLAL":"COBRA", "ZARATE":"LARI"
+};
+
+function contratistaPorSet(valor) {
+  const k = normalizarClaveSet(valor);
+  return contratistaPorSetResponsabilidad[k] || "";
+}
+
+function resolverContratistaPorSet(setValor, alimentador, ptoResponsable, contratistaTicket) {
+  const porSet = contratistaPorSet(setValor);
+  if (porSet) return porSet;
+
+  const porNombreExistente = nombreContratistaPorAlim(setValor, setValor);
+  if (porNombreExistente && porNombreExistente !== "SIN ASIGNAR") return normalizarContratistaResumen(porNombreExistente);
+
+  const porAlim = nombreContratistaPorAlim(alimentador, setValor);
+  if (porAlim && porAlim !== "SIN ASIGNAR") return normalizarContratistaResumen(porAlim);
+
+  return normalizarContratistaResumen(contratistaTicket || ptoResponsable || "");
+}
+
+function clasificarTipoResumenPorTexto(valor) {
+  const t = cruceKeyNorm(valor).toUpperCase();
+  if (!t) return "";
+  if (t.includes("CNX") || t.includes("CONEXION") || t.includes("CONEXIONES") || t.includes("ACOMETIDA")) return "CONEXIONES";
+  if (t.includes("RED") || t.includes("CABLE") || t.includes("TABLERO") || t.includes("FUSIBLE") || t.includes("LLAVE") || t.includes("POSTE") || t.includes("SUBTERRANEA") || t.includes("AEREA")) return "FALLA EN RED";
+  if (t.includes("SUMINISTRO") || t.includes("DOMICILIO") || t.includes("MEDIDOR") || t.includes("CLIENTE") || t.includes("CAJA") || t.includes("MURETE")) return "SUMINISTRO";
+  return "";
+}
+
+function obtenerTipoResumenAtencion(textoUltimaOdm, objetoTecnico) {
+  const desdeOdm = clasificarTipoResumenPorTexto(textoUltimaOdm);
+  if (desdeOdm) return desdeOdm;
+  const desdeObjeto = clasificarTipoResumenPorTexto(objetoTecnico);
+  if (desdeObjeto) return desdeObjeto;
+  return (objetoTecnico || textoUltimaOdm || "SIN CLASIFICAR").toString().trim().toUpperCase();
+}
+
+function cruceMesCorto(idx) {
+  return ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"][idx] || "";
+}
+
+function cruceFechaDiaEtiqueta(valor) {
+  const ms = cruceParseDateMs(valor);
+  if (!ms) return "SIN FECHA";
+  const f = new Date(ms);
+  return `${String(f.getDate()).padStart(2, "0")}-${cruceMesCorto(f.getMonth())}`;
+}
+
+function sumarMatrizResumen(rows, rowKeyFn, colKeyFn, rowOrderBase = []) {
+  const colBase = ["INMEL", "PA", "COBRA", "DOMINION", "LARI"];
+  const rowKeys = [];
+  const rowSeen = new Set();
+  rowOrderBase.forEach(x => { if (x && !rowSeen.has(x)) { rowSeen.add(x); rowKeys.push(x); } });
+  const colSeen = new Set(colBase);
+  const extraCols = [];
+  const counts = {};
+  rows.forEach(r => {
+    const rk = rowKeyFn(r) || "SIN CLASIFICAR";
+    const ck = normalizarContratistaResumen(colKeyFn(r));
+    if (!rowSeen.has(rk)) { rowSeen.add(rk); rowKeys.push(rk); }
+    if (!colSeen.has(ck)) { colSeen.add(ck); extraCols.push(ck); }
+    counts[rk] = counts[rk] || {};
+    counts[rk][ck] = (counts[rk][ck] || 0) + 1;
+  });
+  const cols = [...colBase, ...extraCols.filter(x => x && x !== "SIN ASIGNAR"), ...(extraCols.includes("SIN ASIGNAR") ? ["SIN ASIGNAR"] : [])];
+  const tabla = [];
+  tabla.push(["Etiquetas de fila", ...cols, "Total general"]);
+  rowKeys.forEach(rk => {
+    const vals = cols.map(c => (counts[rk] && counts[rk][c]) || 0);
+    tabla.push([rk, ...vals, vals.reduce((a,b)=>a+b,0)]);
+  });
+  const totals = cols.map(c => rowKeys.reduce((a,rk)=>a+((counts[rk] && counts[rk][c]) || 0),0));
+  tabla.push(["Total general", ...totals, totals.reduce((a,b)=>a+b,0)]);
+  return tabla;
+}
+
+function construirResumenContratistaCruce() {
+  const filas = cruceResults || [];
+  const resumenTipo = sumarMatrizResumen(
+    filas,
+    r => r.tipoResumen || "SIN CLASIFICAR",
+    r => r.contratistaSet || r.contratista,
+    ["SUMINISTRO", "FALLA EN RED", "CONEXIONES"]
+  );
+  const resumenFecha = sumarMatrizResumen(
+    filas,
+    r => cruceFechaDiaEtiqueta(r.horaInicio),
+    r => r.contratistaSet || r.contratista,
+    []
+  );
+  return [
+    ["Cuenta de Ticket", "Etiquetas de columna"],
+    ...resumenTipo,
+    [], [],
+    ["Cuenta de Ticket", "Etiquetas de columna"],
+    ...resumenFecha
+  ];
+}
+
 function cruceBuildCallsIndex() {
   const idx = {};
   cruceCallsRows.forEach((row, i) => {
@@ -2087,9 +2196,10 @@ function cruceBuildFsmIndex() {
 }
 
 function cruceBestFsm(matches) {
+  // Siempre se toma la última ODM por número de Orden.
+  // Si la última está REA, se mostrará como cerrada y NO como activa.
   if (!matches || !matches.length) return null;
-  const active = matches.filter(x => x.active);
-  return active.length ? active[0] : matches[0];
+  return matches[0];
 }
 
 function cruceV(row, col) {
@@ -2162,10 +2272,15 @@ function ejecutarCruce3Archivos() {
     const hasActiveOdm = !!(fsmItem && fsmItem.active);
     const phone = callRow ? (cruceCleanPhone(cruceV(callRow, cruceCallCols.telLlamante)) || cruceCleanPhone(cruceV(callRow, cruceCallCols.telefono))) : "";
     const horaLlamada = callRow ? (cruceV(callRow, cruceCallCols.horaRegistro) || cruceV(callRow, cruceCallCols.horaAveria)) : "";
-    const fsmDetail = fsmMatches.slice(0, 8)
-      .map(x => (x.orden || "—") + " (" + (x.estado || "—") + ")" + (x.textoBreve ? " - " + x.textoBreve : ""))
-      .join("\n");
+    const fsmDetail = fsmMatches.slice(0, 8).map(x => (x.orden || "—") + " (" + (x.estado || "—") + ")").join("\n");
     const horaInicio = cruceV(t, cruceTicketCols.horaInicio);
+    const setTicket = cruceV(t, cruceTicketCols.set);
+    const objetoTecnico = cruceV(t, cruceTicketCols.objetoTecnico);
+    const ptoResponsable = fsmItem ? cruceV(fsmItem.row, cruceFsmCols.responsable) : "";
+    const contratistaTicket = cruceV(t, cruceTicketCols.contratista);
+    const contratistaSet = resolverContratistaPorSet(setTicket, cruceV(t, cruceTicketCols.alimentador), ptoResponsable, contratistaTicket);
+    const textoUltimaOdm = fsmItem ? (fsmItem.textoBreve || "") : "";
+    const tipoResumen = obtenerTipoResumenAtencion(textoUltimaOdm, objetoTecnico);
 
     cruceResults.push({
       rowIndex,
@@ -2173,6 +2288,10 @@ function ejecutarCruce3Archivos() {
       ticket,
       estadoTicket,
       horaInicio,
+      setTicket,
+      objetoTecnico,
+      contratistaSet,
+      tipoResumen,
       hasCall,
       hasFsm,
       hasActiveOdm,
@@ -2191,7 +2310,7 @@ function ejecutarCruce3Archivos() {
       odm: fsmItem ? fsmItem.orden : "",
       estadoOdm: fsmItem ? fsmItem.estado : "",
       textoBreveFsm: fsmItem ? (fsmItem.textoBreve || "") : "",
-      ptoResponsable: fsmItem ? cruceV(fsmItem.row, cruceFsmCols.responsable) : "",
+      ptoResponsable,
       nivelTensionFsm: fsmItem ? cruceV(fsmItem.row, cruceFsmCols.nivel) : "",
       totalOdmsFsm: fsmMatches.length,
       detalleOdmsFsm: fsmDetail,
@@ -2219,7 +2338,11 @@ function resultadoCruceAItemMapa(r, idx) {
     ODM_ACTIVA: r.hasActiveOdm ? "SI" : "NO",
     TEXTO_BREVE_FSM: r.textoBreveFsm,
     DETALLE_ODMS_FSM: r.detalleOdmsFsm,
-    CONTRATISTA: r.contratista || r.ptoResponsable,
+    CONTRATISTA: r.contratistaSet || r.contratista || r.ptoResponsable,
+    CONTRATISTA_SET: r.contratistaSet,
+    SET: r.setTicket,
+    OBJETO_TECNICO: r.objetoTecnico,
+    TIPO_RESUMEN: r.tipoResumen,
     Alimentador: r.alimentador,
     SED: r.sed,
     Distrito: r.distrito || r.distritoLlamada,
@@ -2233,13 +2356,22 @@ function resultadoCruceAItemMapa(r, idx) {
   item.aviso = r.aviso;
   item.horaLlamada = r.horaLlamada;
   item.textoBreveOdm = r.textoBreveFsm || item.textoBreveOdm || "";
+  item.contratistaSet = r.contratistaSet || item.contratistaSet || item.contratista;
+  item.contratista = item.contratistaSet || item.contratista;
+  item.objetoTecnico = r.objetoTecnico || item.objetoTecnico || "";
+  item.tipoResumen = r.tipoResumen || item.tipoResumen || obtenerTipoResumenAtencion(item.textoBreveOdm, item.objetoTecnico);
   item.ptoResponsable = r.ptoResponsable;
   item.nivelTensionFsm = r.nivelTensionFsm;
   return item;
 }
 
 function aplicarAtencionesActivasEnMapa(items, origen = "data online", totalOriginal = null) {
-  atencionesActivasData = ordenarPorMasAntiguos((items || []).filter(x => x.ticket && !isNaN(x.lat) && !isNaN(x.lon) && esTicketActivoExcel(x.estadoTicket)));
+  atencionesActivasData = ordenarPorMasAntiguos((items || []).filter(x => x.ticket && !isNaN(x.lat) && !isNaN(x.lon) && esTicketActivoExcel(x.estadoTicket)).map(x => {
+    x.contratistaSet = x.contratistaSet || x.contratista || resolverContratistaPorSet("", x.alimentador, x.ptoResponsable, x.contratista);
+    x.contratista = x.contratistaSet || x.contratista;
+    x.tipoResumen = x.tipoResumen || obtenerTipoResumenAtencion(x.textoBreveOdm, x.objetoTecnico);
+    return x;
+  }));
   modoSoloAntiguosActivos = false;
   actualizarBotonAntiguosActivos();
   nombreArchivoAtencionesActivas = origen;
@@ -2320,6 +2452,7 @@ async function cruzar3ArchivosYPintarMapa() {
 function cruceExcelHeaders() {
   return [
     ...cruceTicketHeaders,
+    "CONTRATISTA_SET", "SET", "OBJETO_TECNICO", "TIPO_RESUMEN",
     "CRUCE_LLAMADA", "LLAMANTE", "NUMERO_CELULAR", "TEL_LLAMANTE", "TELEFONO_CLIENTE", "AVISO_LLAMADA", "SUMINISTRO_LLAMADA", "HORA_LLAMADA", "DIRECCION_CONTACTO", "DISTRITO_LLAMADA", "COORDENADAS", "LATITUD_BASE", "LONGITUD_BASE",
     "CRUCE_ODM", "ODM", "ESTADO_ODM", "TEXTO_BREVE_FSM", "ODM_ACTIVA", "PTO_TBJO_RESPONSABLE", "NIVEL_TENSION_FSM", "TOTAL_ODMS_FSM", "DETALLE_ODMS_FSM"
   ];
@@ -2331,8 +2464,9 @@ function cruceRowsParaExportar() {
   cruceResults.forEach(r => {
     const base = cruceTicketHeaders.map(h => r.raw[h] ?? "");
     const extra = [
+      r.contratistaSet, r.setTicket, r.objetoTecnico, r.tipoResumen,
       r.hasCall ? "CON LLAMADA" : "SIN LLAMADA", r.llamante, r.numeroCelular, r.telLlamante, r.telefonoCliente, r.aviso, r.suministro, r.horaLlamada, r.direccionContacto, r.distritoLlamada, r.coordenadas, r.latitudBase, r.longitudBase,
-      r.hasActiveOdm ? "CON ODM ACTIVA" : (r.hasFsm ? "ODM NO ACTIVA" : "SIN REGISTRO FSM"), r.odm, r.estadoOdm, r.textoBreveFsm, r.hasActiveOdm ? "SI" : "NO", r.ptoResponsable, r.nivelTensionFsm, r.totalOdmsFsm, r.detalleOdmsFsm
+      r.hasActiveOdm ? "CON ODM ACTIVA" : (r.hasFsm ? (cruceFsmTokens(r.estadoOdm).includes("REA") ? "ODM CERRADA" : "ODM NO ACTIVA") : "SIN REGISTRO FSM"), r.odm, r.estadoOdm, r.textoBreveFsm, r.hasActiveOdm ? "SI" : "NO", r.ptoResponsable, r.nivelTensionFsm, r.totalOdmsFsm, r.detalleOdmsFsm
     ];
     data.push([...base, ...extra]);
   });
@@ -2349,14 +2483,16 @@ function exportarCruceMapaExcel() {
   const ws = XLSX.utils.aoa_to_sheet(data);
   ws["!cols"] = data[0].map(h => ({ wch: Math.min(Math.max(String(h).length + 2, 12), 34) }));
   XLSX.utils.book_append_sheet(wb, ws, "CRUCE_3_EXCEL");
-  const resumen = [
-    ["Métrica", "Valor"],
+  const resumen = construirResumenContratistaCruce();
+  resumen.push([], ["Métrica", "Valor"],
     ["Archivo tickets", cruceTicketFileName], ["Archivo llamadas", cruceCallsFileName], ["Archivo FSM", cruceFsmFileName],
     ["Tickets evaluados", cruceResults.length], ["Pintados en mapa", atencionesActivasData.length],
     ["Con llamada", cruceResults.filter(r => r.hasCall).length], ["Sin llamada", cruceResults.filter(r => !r.hasCall).length],
     ["Con ODM activa", cruceResults.filter(r => r.hasActiveOdm).length], ["Sin ODM activa", cruceResults.filter(r => !r.hasActiveOdm).length]
-  ];
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(resumen), "RESUMEN");
+  );
+  const wsResumen = XLSX.utils.aoa_to_sheet(resumen);
+  wsResumen["!cols"] = [{ wch: 22 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 14 }, { wch: 12 }, { wch: 14 }];
+  XLSX.utils.book_append_sheet(wb, wsResumen, "RESUMEN");
   XLSX.writeFile(wb, "Cruce_3_Excel_Tickets_Llamadas_FSM.xlsx");
 }
 
@@ -2376,7 +2512,8 @@ function activosParaJsonRepositorio() {
       lat: x.lat, lon: x.lon,
       odm: x.odm, estadoOdm: x.estadoOdm, textoBreveOdm: x.textoBreveOdm || "", odmActiva: !!x.odmActiva,
       odmActivaTxt: x.odmActivaTxt || (x.odmActiva ? "SI" : "NO"), detalleOdms: x.detalleOdms || "",
-      contratista: x.contratista || "", alimentador: x.alimentador || "", sed: x.sed || "", distrito: x.distrito || "",
+      contratista: x.contratistaSet || x.contratista || "", contratistaSet: x.contratistaSet || x.contratista || "", tipoResumen: x.tipoResumen || obtenerTipoResumenAtencion(x.textoBreveOdm, x.objetoTecnico), objetoTecnico: x.objetoTecnico || "",
+      alimentador: x.alimentador || "", sed: x.sed || "", distrito: x.distrito || "",
       suministro: x.suministro || "", direccion: x.direccion || "",
       horaInicio: x.horaInicio || "", fechaInicioMs: x.fechaInicioMs || null,
       llamante: x.llamante || "", numeroCelular: x.numeroCelular || "", aviso: x.aviso || "", horaLlamada: x.horaLlamada || "",
@@ -2416,11 +2553,13 @@ function itemDesdeJsonOnline(x, idx) {
     lon: parseFloat(x.lon),
     odm: limpiarTextoExcel(x.odm),
     estadoOdm: limpiarTextoExcel(x.estadoOdm),
-    textoBreveOdm: limpiarTextoExcel(x.textoBreveOdm || x.textoBreveFsm || x.textoBreve),
-    odmActiva: esOdmActivaExcel(x.odmActivaTxt || (x.odmActiva ? "SI" : "NO"), x.estadoOdm),
+    odmActiva: !!x.odmActiva,
     odmActivaTxt: limpiarTextoExcel(x.odmActivaTxt),
     detalleOdms: limpiarTextoExcel(x.detalleOdms),
-    contratista: limpiarTextoExcel(x.contratista),
+    contratista: limpiarTextoExcel(x.contratistaSet || x.contratista),
+    contratistaSet: limpiarTextoExcel(x.contratistaSet || x.contratista),
+    tipoResumen: limpiarTextoExcel(x.tipoResumen || obtenerTipoResumenAtencion(x.textoBreveOdm || x.textoBreveFsm || x.textoBreve, x.objetoTecnico)),
+    objetoTecnico: limpiarTextoExcel(x.objetoTecnico),
     alimentador: limpiarTextoExcel(x.alimentador),
     sed: limpiarTextoExcel(x.sed),
     distrito: limpiarTextoExcel(x.distrito),
