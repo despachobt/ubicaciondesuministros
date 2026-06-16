@@ -56,14 +56,15 @@
 input[type=range] {
   accent-color: #0d6efd; /* azul bootstrap */
 }
-/* Panel flotante herramientas */
-#panelHerramientas {
+/* Paneles flotantes */
+#panelHerramientas,
+.panel-flotante {
   position: absolute;
   left: 340px;
   top: 85px;              /* evita que el panel se pierda por arriba */
-  bottom: 90px;           /* deja visible el botón inferior */
+  bottom: 190px;          /* deja libre la columna de botones flotantes */
   width: 300px;
-  max-height: calc(100vh - 175px);
+  max-height: calc(100vh - 275px);
   overflow-y: auto;       /* ahora el contenido se desplaza dentro del panel */
   background: #ffffff;
   border: 2px solid #ddd;
@@ -78,28 +79,96 @@ input[type=range] {
   transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
 }
 
-#panelHerramientas::-webkit-scrollbar {
+#panelMaps { width: 330px; }
+#panelTickets { width: 330px; }
+#panelTickets {
+  bottom: 210px;
+  max-height: calc(100vh - 295px);
+}
+
+#panelHerramientas::-webkit-scrollbar,
+.panel-flotante::-webkit-scrollbar {
   width: 8px;
 }
-#panelHerramientas::-webkit-scrollbar-thumb {
+#panelHerramientas::-webkit-scrollbar-thumb,
+.panel-flotante::-webkit-scrollbar-thumb {
   background: #b8c2cc;
   border-radius: 8px;
 }
 
 @media (max-height: 760px) {
-  #panelHerramientas {
+  #panelHerramientas,
+  .panel-flotante {
     top: 65px;
-    bottom: 65px;
-    max-height: calc(100vh - 130px);
+    bottom: 175px;
+    max-height: calc(100vh - 240px);
+  }
+  #panelTickets {
+    bottom: 190px;
+    max-height: calc(100vh - 255px);
   }
 }
 
-#panelHerramientas.visible {
+#panelHerramientas.visible,
+.panel-flotante.visible {
   opacity: 1;
   pointer-events: auto;
   transform: translateY(0);
 }
 
+.panel-float-btn,
+#toggleHerramientasBtn,
+#toggleAtencionesBtn {
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.24);
+  border: 1px solid rgba(255,255,255,0.35);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
+}
+.panel-float-btn:hover,
+#toggleHerramientasBtn:hover,
+#toggleAtencionesBtn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.30);
+  filter: brightness(1.03);
+}
+.panel-float-btn:active,
+#toggleHerramientasBtn:active,
+#toggleAtencionesBtn:active {
+  transform: translateY(0);
+  box-shadow: 0 5px 14px rgba(15, 23, 42, 0.24);
+}
+
+body.modo-oscuro-mapa #sidebar,
+body.modo-oscuro-mapa #panelHerramientas,
+body.modo-oscuro-mapa .panel-flotante,
+body.modo-oscuro-mapa #panelAtenciones {
+  background: #111827;
+  color: #e5e7eb;
+  border-color: #374151;
+}
+body.modo-oscuro-mapa .card,
+body.modo-oscuro-mapa .google-direccion-box,
+body.modo-oscuro-mapa .cruce-integrado-box,
+body.modo-oscuro-mapa .list-group-item {
+  background: #1f2937;
+  color: #e5e7eb;
+  border-color: #374151;
+}
+body.modo-oscuro-mapa .text-muted,
+body.modo-oscuro-mapa .google-direccion-box .mini,
+body.modo-oscuro-mapa .cruce-integrado-box .cruce-mini {
+  color: #9ca3af !important;
+}
+body.modo-oscuro-mapa .form-control,
+body.modo-oscuro-mapa .form-select {
+  background: #0f172a;
+  color: #e5e7eb;
+  border-color: #475569;
+}
+body.modo-oscuro-mapa .leaflet-control-zoom a,
+body.modo-oscuro-mapa .leaflet-control-attribution {
+  background: #111827 !important;
+  color: #e5e7eb !important;
+}
 
 
 /* ============================
@@ -136,6 +205,71 @@ input[type=range] {
 .cruce-integrado-box .cruce-ok { color: #198754; font-weight: 700; }
 .cruce-integrado-box .cruce-warn { color: #fd7e14; font-weight: 700; }
 .cruce-integrado-box .cruce-err { color: #dc3545; font-weight: 700; }
+
+.google-direccion-box { border: 1px solid #e5e7eb; border-radius: 10px; padding: 10px; background: #f8fafc; }
+.google-direccion-box .mini { font-size: 11px; line-height: 1.35; color: #64748b; }
+.google-direccion-box .ok { color: #198754; font-weight: 700; }
+.google-direccion-box .warn { color: #fd7e14; font-weight: 700; }
+.google-direccion-box .err { color: #dc3545; font-weight: 700; }
+#listaSugerenciasPhoton {
+  max-height: 190px;
+  overflow-y: auto;
+}
+#listaSugerenciasPhoton .list-group-item {
+  padding: 7px 8px;
+}
+#listaSugerenciasPhoton .principal {
+  font-weight: 700;
+  color: #0f172a;
+}
+#listaSugerenciasPhoton .detalle {
+  font-size: 11px;
+  color: #64748b;
+}
+#panelStreetViewGoogle {
+  display: none;
+  position: absolute;
+  right: 20px;
+  top: 85px;
+  width: 420px;
+  max-width: calc(100vw - 40px);
+  height: 330px;
+  background: #ffffff;
+  border-radius: 10px;
+  box-shadow: 0 6px 24px rgba(15, 23, 42, 0.22);
+  z-index: 1700;
+  overflow: hidden;
+}
+#panelStreetViewGoogle.visible { display: block; }
+#streetViewGoogleHeader {
+  height: 42px;
+  padding: 8px 10px;
+  background: #0f172a;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+#streetViewGoogleTitulo {
+  font-size: 13px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#streetViewGoogleCanvas {
+  width: 100%;
+  height: calc(100% - 42px);
+  background: #e5e7eb;
+}
+#streetViewGoogleFallback {
+  display: none;
+  padding: 16px;
+  height: calc(100% - 42px);
+  font-size: 13px;
+  color: #475569;
+}
 
 </style>
 </head>
@@ -231,8 +365,16 @@ input[type=range] {
   📋 Atenciones
 </button>
 <button class="btn btn-primary" id="toggleHerramientasBtn"
-        style="position:absolute; bottom:70px; left:340px; z-index:1600;">
+        style="position:absolute; bottom:20px; left:340px; z-index:1600;">
   🛠️ Herramientas
+</button>
+<button class="btn btn-primary panel-float-btn" id="toggleMapsBtn"
+        style="position:absolute; bottom:70px; left:340px; z-index:1600;">
+  Maps
+</button>
+<button class="btn btn-primary panel-float-btn" id="toggleTicketsBtn"
+        style="position:absolute; bottom:120px; left:340px; z-index:1600;">
+  Tickets
 </button>
 <div id="panelHerramientas">
   <h5>🛠️ Herramientas del mapa</h5>
@@ -268,7 +410,46 @@ input[type=range] {
   </div>
 
 
+  <button id="btnSED" class="btn btn-primary btn-sm w-100 mb-2">
+    📡 Mostrar SEDs
+  </button>
+  <button id="btnRespAlim" class="btn btn-info btn-sm w-100 mb-2">
+    ⚡ Responsabilidad por alimentador
+  </button>
 
+<button id="btnTecnicos" class="btn btn-success btn-sm w-100 mb-2">
+  👷 Mostrar técnicos
+</button>
+
+  <button id="btnModoOscuroMapa" class="btn btn-dark btn-sm w-100 mb-2">
+    Modo oscuro
+  </button>
+
+  <button id="btnComparar" class="btn btn-danger btn-sm w-100">
+    📏 Comparar distancia
+  </button>
+</div>
+<div id="panelMaps" class="panel-flotante">
+  <h5>Maps</h5>
+  <div class="card mb-3">
+    <div class="card-body p-2">
+      <h6 class="mb-2">Direcciones OSM y Street View</h6>
+      <div class="google-direccion-box">
+        <input type="text" id="googleDireccionInput" class="form-control form-control-sm mb-2"
+               placeholder="Buscar direccion o lugar">
+        <div id="listaSugerenciasPhoton" class="list-group small mb-2" style="display:none;"></div>
+        <button id="btnBuscarDireccionGoogle" class="btn btn-primary btn-sm w-100 mb-2">Buscar direccion en mapa</button>
+        <button id="btnStreetViewUltimoPunto" class="btn btn-outline-secondary btn-sm w-100 mb-2">Street View del ultimo punto</button>
+        <button id="btnAbrirGoogleMapsDireccion" class="btn btn-outline-primary btn-sm w-100 mb-2">Abrir en Google Maps</button>
+        <div id="estadoGoogleDireccion" class="mini">
+          Escribe una direccion y elige una sugerencia de OpenStreetMap. Street View se abre con Google Maps.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div id="panelTickets" class="panel-flotante">
+  <h5>Tickets</h5>
   <div class="card mb-3">
     <div class="card-body p-2">
       <h6 class="mb-2">🔎 Filtrar activos</h6>
@@ -280,12 +461,22 @@ input[type=range] {
         Los activos se cargan desde el cruce de 3 archivos o desde <b>data/activos_mapa.json</b>.
       </div>
 
+      <div id="estadoJsonActivosOnline" class="small text-muted mb-2">
+        Revisando data online...
+      </div>
+
+      <button id="btnToggleAtencionesActivas" class="btn btn-outline-primary btn-sm w-100 mb-2" style="display:none;">
+        Mostrar activos en mapa
+      </button>
+
+      <button id="btnVerAntiguosActivos" class="btn btn-outline-danger btn-sm w-100 mb-2" style="display:none;">
+        Ver mas antiguos
+      </button>
+
       <div id="listaAtencionesActivasFiltradas" class="list-group small"
            style="max-height:260px; overflow-y:auto;"></div>
     </div>
   </div>
-
-
 
   <div class="card mb-3">
     <div class="card-body p-2">
@@ -313,21 +504,16 @@ input[type=range] {
       </div>
     </div>
   </div>
-
-  <button id="btnSED" class="btn btn-primary btn-sm w-100 mb-2">
-    📡 Mostrar SEDs
-  </button>
-  <button id="btnRespAlim" class="btn btn-info btn-sm w-100 mb-2">
-    ⚡ Responsabilidad por alimentador
-  </button>
-
-<button id="btnTecnicos" class="btn btn-success btn-sm w-100 mb-2">
-  👷 Mostrar técnicos
-</button>
-
-  <button id="btnComparar" class="btn btn-danger btn-sm w-100">
-    📏 Comparar distancia
-  </button>
+</div>
+<div id="panelStreetViewGoogle">
+  <div id="streetViewGoogleHeader">
+    <span id="streetViewGoogleTitulo">Street View</span>
+    <button id="btnCerrarStreetViewGoogle" class="btn btn-light btn-sm">Cerrar</button>
+  </div>
+  <div id="streetViewGoogleCanvas"></div>
+  <div id="streetViewGoogleFallback">
+    Configura tu API key de Google Maps para ver Street View dentro del buscador.
+  </div>
 </div>
 <div id="panelAtenciones">
   <h5>📋 Atenciones del suministro</h5>
@@ -353,6 +539,20 @@ let sedClientesListas = false;
 let cargandoSedClientesPromise = null;
 let firebaseInicializado = false;
 let escuchandoTecnicos = false;
+const GOOGLE_MAPS_API_KEY = ""; // Coloca aqui tu API key para activar busqueda integrada y Street View.
+let googleMapsCargado = false;
+let googleMapsCargandoPromise = null;
+let googleGeocoder = null;
+let googleStreetViewService = null;
+let googleStreetViewPanorama = null;
+let googleAutocomplete = null;
+let marcadorGoogleDireccion = null;
+let ultimoPuntoGoogle = null;
+let ultimaReferenciaSed = null;
+let ultimaCoordenadaBusqueda = null;
+let ultimoClienteBuscadoAtenciones = null;
+let photonSugerencias = [];
+let photonTimer = null;
 const RADIO_VISUAL_SED = 1000; // metros
 // ============================
 // 📏 COMPARAR DISTANCIAS
@@ -388,20 +588,29 @@ const HORAS_ANTIGUO_ACTIVO = 4; // rojo desde 4 horas de antigüedad
 
 // Inicializa mapa
 map = L.map('map').setView([-11.95, -76.95], 8);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+const capaMapaClaro = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: 'Map data © OpenStreetMap contributors'
-}).addTo(map);
+});
+const capaMapaOscuro = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+  attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+  subdomains: 'abcd',
+  maxZoom: 20
+});
+capaMapaClaro.addTo(map);
+let modoOscuroMapa = false;
 const btnRespAlim = document.getElementById("btnRespAlim");
 const btnTecnicos = document.getElementById("btnTecnicos");
+const btnModoOscuroMapa = document.getElementById("btnModoOscuroMapa");
 
 // ============================
 // 📂 BOTONES ATENCIONES ACTIVAS DESDE EXCEL
 // ============================
-const btnCargarActivosExcel = null;
-const inputActivosExcel = null;
-const btnToggleAtencionesActivas = null;
-const btnVerAntiguosActivos = null;
+const btnCargarActivosExcel = document.getElementById("btnCargarActivosExcel");
+const inputActivosExcel = document.getElementById("inputActivosExcel");
+const btnToggleAtencionesActivas = document.getElementById("btnToggleAtencionesActivas");
+const btnVerAntiguosActivos = document.getElementById("btnVerAntiguosActivos");
 const filtroAtencionesActivas = document.getElementById("filtroAtencionesActivas");
+const estadoJsonActivosOnline = document.getElementById("estadoJsonActivosOnline");
 
 const cruceTicketsInput = document.getElementById("cruceTicketsInput");
 const cruceCallsInput = document.getElementById("cruceCallsInput");
@@ -410,6 +619,11 @@ const btnCruzar3ArchivosMapa = document.getElementById("btnCruzar3ArchivosMapa")
 const btnExportarCruceMapaExcel = document.getElementById("btnExportarCruceMapaExcel");
 const btnExportarActivosJsonRepo = document.getElementById("btnExportarActivosJsonRepo");
 const estadoCruceMapa = document.getElementById("estadoCruceMapa");
+const googleDireccionInput = document.getElementById("googleDireccionInput");
+const btnBuscarDireccionGoogle = document.getElementById("btnBuscarDireccionGoogle");
+const btnStreetViewUltimoPunto = document.getElementById("btnStreetViewUltimoPunto");
+const btnAbrirGoogleMapsDireccion = document.getElementById("btnAbrirGoogleMapsDireccion");
+const btnCerrarStreetViewGoogle = document.getElementById("btnCerrarStreetViewGoogle");
 
 if (btnToggleAtencionesActivas) {
   btnToggleAtencionesActivas.addEventListener("click", alternarAtencionesActivas);
@@ -437,6 +651,29 @@ if (btnExportarCruceMapaExcel) {
 if (btnExportarActivosJsonRepo) {
   btnExportarActivosJsonRepo.addEventListener("click", exportarActivosJsonRepositorio);
 }
+if (btnBuscarDireccionGoogle) {
+  btnBuscarDireccionGoogle.addEventListener("click", buscarDireccionPhoton);
+}
+if (googleDireccionInput) {
+  googleDireccionInput.addEventListener("input", manejarInputPhoton);
+  googleDireccionInput.addEventListener("keydown", (ev) => {
+    if (ev.key === "Enter") buscarDireccionPhoton();
+  });
+}
+if (btnStreetViewUltimoPunto) {
+  btnStreetViewUltimoPunto.addEventListener("click", mostrarStreetViewUltimoPunto);
+}
+if (btnAbrirGoogleMapsDireccion) {
+  btnAbrirGoogleMapsDireccion.addEventListener("click", abrirGoogleMapsBusquedaDireccion);
+}
+if (btnCerrarStreetViewGoogle) {
+  btnCerrarStreetViewGoogle.addEventListener("click", () => {
+    const panel = document.getElementById("panelStreetViewGoogle");
+    if (panel) panel.classList.remove("visible");
+  });
+}
+
+inicializarGoogleDireccionSiTieneKey();
 
 btnRespAlim.addEventListener("click", () => {
   if (!respAlimVisible) {
@@ -478,6 +715,27 @@ btnTecnicos.addEventListener("click", async () => {
   }
 });
 
+if (btnModoOscuroMapa) {
+  btnModoOscuroMapa.addEventListener("click", () => {
+    modoOscuroMapa = !modoOscuroMapa;
+    if (modoOscuroMapa) {
+      map.removeLayer(capaMapaClaro);
+      capaMapaOscuro.addTo(map);
+      document.body.classList.add("modo-oscuro-mapa");
+      btnModoOscuroMapa.textContent = "Modo claro";
+      btnModoOscuroMapa.classList.remove("btn-dark");
+      btnModoOscuroMapa.classList.add("btn-light");
+    } else {
+      map.removeLayer(capaMapaOscuro);
+      capaMapaClaro.addTo(map);
+      document.body.classList.remove("modo-oscuro-mapa");
+      btnModoOscuroMapa.textContent = "Modo oscuro";
+      btnModoOscuroMapa.classList.remove("btn-light");
+      btnModoOscuroMapa.classList.add("btn-dark");
+    }
+  });
+}
+
 // ============================
 // 🔷 BOTÓN MOSTRAR / OCULTAR SEDs
 // ============================
@@ -496,18 +754,66 @@ document.getElementById("btnComparar").addEventListener("click", () => {
 });
 
 // 🔷 BOTÓN MOSTRAR / OCULTAR SEDs
+function guardarReferenciaSed(lat, lon, etiqueta = "Punto de referencia") {
+  ultimaReferenciaSed = { lat: Number(lat), lon: Number(lon), etiqueta };
+}
+
+function obtenerReferenciaSedActual() {
+  if (ultimaReferenciaSed) return ultimaReferenciaSed;
+  if (ultimoEncontro) return { lat: ultimoEncontro.lat, lon: ultimoEncontro.lon, etiqueta: "Suministro" };
+  if (ultimaSED) return { lat: ultimaSED.lat, lon: ultimaSED.lon, etiqueta: "SED" };
+  if (ultimaCoordenadaBusqueda) return ultimaCoordenadaBusqueda;
+  return null;
+}
+
+function pintarSEDsCercanas(latRef, lonRef) {
+  sedLayer.clearLayers();
+
+  sedDatos.forEach(obj => {
+    const dMetros = distancia(latRef, lonRef, obj.lat, obj.lon);
+    if (dMetros > RADIO_VISUAL_SED) return;
+
+    const contratistaSED = nombreContratistaPorAlim(obj.alim, obj.sed);
+    const colorSED = colorPorContratista(contratistaSED);
+
+    const rect = L.rectangle(
+      [
+        [obj.lat - 0.00005, obj.lon - 0.00005],
+        [obj.lat + 0.00005, obj.lon + 0.00005]
+      ],
+      { color: colorSED, weight: 2, fillOpacity: 0.65 }
+    ).bindTooltip(`SED: ${obj.sed}<br>ALIM: ${obj.alim}<br>Contratista: ${contratistaSED}<br>Distancia: ${dMetros.toFixed(1)} m`);
+
+    sedLayer.addLayer(rect);
+
+    const labelIcon = L.divIcon({
+      className: "sed-label",
+      html: `<div>${obj.sed}</div>`,
+      iconSize: [90, 20],
+      iconAnchor: [45, -12]
+    });
+
+    const labelMarker = L.marker([obj.lat, obj.lon], {
+      icon: labelIcon,
+      interactive: false
+    });
+
+    sedLayer.addLayer(labelMarker);
+  });
+}
+
 document.getElementById("btnSED").addEventListener("click", () => {
   const btn = document.getElementById("btnSED");
 
   if (!sedVisible) {
     sedLayer.clearLayers();
 
-    if (!ultimoEncontro && !ultimaSED) {
+    const ref = obtenerReferenciaSedActual();
+    if (!ref) {
       alert("⚠️ Primero busca un suministro o una SED");
       return;
     }
 
-    const ref = ultimoEncontro || ultimaSED;
     const latRef = ref.lat;
     const lonRef = ref.lon;
 
@@ -589,6 +895,27 @@ const verEnGoogleSED = document.getElementById("verEnGoogleSED");
 
 const coordInput = document.getElementById("coordInput");
 const resultadoCoord = document.getElementById("resultadoCoord");
+
+["user", "pass"].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) {
+    el.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter") {
+        ev.preventDefault();
+        login();
+      }
+    });
+  }
+});
+
+if (searchBox) {
+  searchBox.addEventListener("keydown", (ev) => {
+    if (ev.key === "Enter") {
+      ev.preventDefault();
+      buscarSuministro();
+    }
+  });
+}
 	
 // ============================
 // ============================
@@ -1509,6 +1836,19 @@ function formatearFechaInicioActiva(valor, fecha = null) {
   return `${dd}/${mm}/${yyyy} ${hh}:${mi}`;
 }
 
+function formatearFechaHoraJson(valor) {
+  if (!valor) return "";
+  const fecha = valor instanceof Date ? valor : new Date(valor);
+  if (isNaN(fecha.getTime())) return limpiarTextoExcel(valor);
+  return fecha.toLocaleString("es-PE", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+
 function calcularHorasAntiguedadActiva(item) {
   if (!item || !item.fechaInicioMs) return null;
   const horas = (Date.now() - item.fechaInicioMs) / 3600000;
@@ -1765,6 +2105,7 @@ function dibujarAtencionesActivas() {
 function alternarAtencionesActivas() {
   if (atencionesActivasData.length === 0) {
     if (inputActivosExcel) inputActivosExcel.click();
+    else alert("Aun no hay activos cargados. Genera el cruce o publica data/activos_mapa.json.");
     return;
   }
 
@@ -2365,7 +2706,7 @@ function resultadoCruceAItemMapa(r, idx) {
   return item;
 }
 
-function aplicarAtencionesActivasEnMapa(items, origen = "data online", totalOriginal = null) {
+function aplicarAtencionesActivasEnMapa(items, origen = "data online", totalOriginal = null, opciones = {}) {
   atencionesActivasData = ordenarPorMasAntiguos((items || []).filter(x => x.ticket && !isNaN(x.lat) && !isNaN(x.lon) && esTicketActivoExcel(x.estadoTicket)).map(x => {
     x.contratistaSet = x.contratistaSet || x.contratista || resolverContratistaPorSet("", x.alimentador, x.ptoResponsable, x.contratista);
     x.contratista = x.contratistaSet || x.contratista;
@@ -2381,6 +2722,10 @@ function aplicarAtencionesActivasEnMapa(items, origen = "data online", totalOrig
   const resumen = document.getElementById("resumenAtencionesActivas");
   const lista = document.getElementById("listaAtencionesActivasFiltradas");
   const total = totalOriginal == null ? atencionesActivasData.length : totalOriginal;
+  const mostrarEnMapa = opciones.mostrarEnMapa !== false;
+  const textoActualizacion = opciones.actualizacion
+    ? `<br><span class="text-primary">Ultima actualizacion JSON: ${escapeHtml(formatearFechaHoraJson(opciones.actualizacion))}</span>`
+    : "";
   const conOdm = atencionesActivasData.filter(x => x.odmActiva).length;
   const sinOdm = atencionesActivasData.filter(x => !x.odm).length;
   const antiguos = atencionesActivasData.filter(esAtencionAntigua).length;
@@ -2395,7 +2740,7 @@ function aplicarAtencionesActivasEnMapa(items, origen = "data online", totalOrig
       <span class="text-danger">${antiguos} antiguos (&gt; ${HORAS_ANTIGUO_ACTIVO} h, pintados rojo)</span> ·
       <span class="text-success">${conOdm} con ODM activa</span> ·
       <span class="text-warning">${sinOdm} sin ODM/FSM</span> ·
-      <span class="text-muted">${Math.max(0, total - atencionesActivasData.length)} filtrados/sin coordenadas</span>${textoMasAntiguo}`;
+      <span class="text-muted">${Math.max(0, total - atencionesActivasData.length)} filtrados/sin coordenadas</span>${textoActualizacion}${textoMasAntiguo}`;
   }
 
   if (btnToggleAtencionesActivas) {
@@ -2409,13 +2754,17 @@ function aplicarAtencionesActivasEnMapa(items, origen = "data online", totalOrig
   if (filtroAtencionesActivas) filtroAtencionesActivas.style.display = "block";
   if (lista) lista.style.display = "block";
 
-  if (!atencionesActivasVisible) {
+  if (mostrarEnMapa && !atencionesActivasVisible) {
     map.addLayer(capaAtencionesActivas);
     atencionesActivasVisible = true;
     if (btnToggleAtencionesActivas) btnToggleAtencionesActivas.textContent = "❌ Ocultar activos en mapa";
+  } else if (!mostrarEnMapa && atencionesActivasVisible) {
+    map.removeLayer(capaAtencionesActivas);
+    atencionesActivasVisible = false;
+    if (btnToggleAtencionesActivas) btnToggleAtencionesActivas.textContent = "👁️ Mostrar activos en mapa";
   }
 
-  if (capaAtencionesActivas.getLayers().length > 0) {
+  if (mostrarEnMapa && capaAtencionesActivas.getLayers().length > 0) {
     map.fitBounds(capaAtencionesActivas.getBounds().pad(0.15));
   }
 }
@@ -2580,19 +2929,38 @@ function itemDesdeJsonOnline(x, idx) {
 async function cargarActivosOnlineSiExiste() {
   try {
     const resp = await fetch("data/activos_mapa.json", { cache: "no-store" });
-    if (!resp.ok) return;
+    if (!resp.ok) {
+      if (estadoJsonActivosOnline) estadoJsonActivosOnline.textContent = "No hay JSON online publicado todavia.";
+      return;
+    }
     const json = await resp.json();
     const items = Array.isArray(json) ? json.map(itemDesdeJsonOnline) : (json.activos || []).map(itemDesdeJsonOnline);
-    if (!items.length) return;
-    aplicarAtencionesActivasEnMapa(items, "data/activos_mapa.json", items.length);
-    estadoCruce(`🌐 Activos online cargados: ${items.length}.`, "ok");
+    if (!items.length) {
+      if (estadoJsonActivosOnline) estadoJsonActivosOnline.textContent = "JSON online encontrado, pero sin activos.";
+      return;
+    }
+    const ultimaActualizacion = Array.isArray(json)
+      ? resp.headers.get("Last-Modified")
+      : (json.generado || json.actualizado || resp.headers.get("Last-Modified"));
+
+    aplicarAtencionesActivasEnMapa(items, "data/activos_mapa.json", items.length, {
+      mostrarEnMapa: false,
+      actualizacion: ultimaActualizacion
+    });
+    const textoHora = formatearFechaHoraJson(ultimaActualizacion);
+    if (estadoJsonActivosOnline) {
+      estadoJsonActivosOnline.innerHTML = `JSON online listo: <b>${items.length}</b> activos${textoHora ? `<br>Ultima actualizacion: <b>${escapeHtml(textoHora)}</b>` : ""}`;
+    }
+    estadoCruce(`🌐 Activos online listos: ${items.length}. Presiona "Mostrar activos en mapa" para verlos.`, "ok");
     if (btnExportarActivosJsonRepo) btnExportarActivosJsonRepo.style.display = "block";
   } catch (err) {
+    if (estadoJsonActivosOnline) estadoJsonActivosOnline.textContent = "No se pudo leer data/activos_mapa.json.";
     console.log("No hay activos online o no se pudo leer data/activos_mapa.json", err);
   }
 }
 
-// Si publicas data/activos_mapa.json en GitHub Pages, el mapa lo cargará solo.
+// Si publicas data/activos_mapa.json en GitHub Pages, el mapa lo lee al abrir,
+// pero no muestra los marcadores hasta que uses el boton del panel.
 cargarActivosOnlineSiExiste();
 
 
@@ -2653,6 +3021,8 @@ async function mostrarAtenciones(clienteID) {
 // Actualizar mapa / marcador principal
 function actualizarMapa(lat,lon,encontrado){
   if(marker) map.removeLayer(marker);
+  guardarUltimoPuntoGoogle(lat, lon, `Cliente ${encontrado.cliente || ""}`.trim());
+  guardarReferenciaSed(lat, lon, `Cliente ${encontrado.cliente || ""}`.trim());
 
   marker = L.marker([lat,lon],{
     title:"Cliente "+(encontrado.cliente||"")
@@ -2676,6 +3046,381 @@ function actualizarMapa(lat,lon,encontrado){
 // Abrir en Google Maps
 function abrirEnGoogleMaps(){ if(ultimoEncontro){ window.open(`https://www.google.com/maps/search/?api=1&query=${ultimoEncontro.lat},${ultimoEncontro.lon}`,'_blank'); }}
 function abrirEnGoogleMapsSED(){ if(ultimaSED){ window.open(`https://www.google.com/maps/search/?api=1&query=${ultimaSED.lat},${ultimaSED.lon}`,'_blank'); }}
+
+function estadoGoogleDireccion(html, tipo = "") {
+  const el = document.getElementById("estadoGoogleDireccion");
+  if (!el) return;
+  el.innerHTML = tipo ? `<span class="${tipo}">${html}</span>` : html;
+}
+
+function obtenerTextoDireccionGoogle() {
+  const input = document.getElementById("googleDireccionInput");
+  return input ? input.value.trim() : "";
+}
+
+function abrirGoogleMapsBusquedaDireccion() {
+  const texto = obtenerTextoDireccionGoogle();
+  if (texto) {
+    window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(texto)}`, "_blank");
+    return;
+  }
+  const punto = ultimoPuntoGoogle || puntoActualParaStreetView();
+  if (punto) {
+    window.open(`https://www.google.com/maps/search/?api=1&query=${punto.lat},${punto.lon}`, "_blank");
+    return;
+  }
+  alert("Escribe una direccion o busca primero un suministro, SED o coordenada.");
+}
+
+function abrirGoogleStreetViewWeb(lat, lon) {
+  window.open(`https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lon}`, "_blank");
+}
+
+function textoLugarPhoton(feature) {
+  const p = feature && feature.properties ? feature.properties : {};
+  const principal = p.name || p.street || p.city || p.district || p.county || "Direccion";
+  const partes = [p.street, p.housenumber, p.district, p.city, p.county, p.state, p.country]
+    .filter(Boolean)
+    .filter((x, i, arr) => arr.indexOf(x) === i);
+  return {
+    principal,
+    detalle: partes.join(", ")
+  };
+}
+
+function ocultarSugerenciasPhoton() {
+  const lista = document.getElementById("listaSugerenciasPhoton");
+  if (!lista) return;
+  lista.innerHTML = "";
+  lista.style.display = "none";
+}
+
+function pintarSugerenciasPhoton(features) {
+  const lista = document.getElementById("listaSugerenciasPhoton");
+  if (!lista) return;
+
+  lista.innerHTML = "";
+  photonSugerencias = features || [];
+
+  if (!photonSugerencias.length) {
+    ocultarSugerenciasPhoton();
+    return;
+  }
+
+  photonSugerencias.forEach((feature, idx) => {
+    const txt = textoLugarPhoton(feature);
+    const item = document.createElement("button");
+    item.type = "button";
+    item.className = "list-group-item list-group-item-action text-start";
+    item.innerHTML = `<div class="principal">${escapeHtml(txt.principal)}</div><div class="detalle">${escapeHtml(txt.detalle)}</div>`;
+    item.onclick = () => seleccionarSugerenciaPhoton(idx);
+    lista.appendChild(item);
+  });
+
+  lista.style.display = "block";
+}
+
+async function consultarPhoton(texto, limite = 6) {
+  const params = new URLSearchParams({
+    q: texto,
+    limit: String(limite),
+    lang: "es",
+    lat: "-12.0464",
+    lon: "-77.0428"
+  });
+  const resp = await fetch(`https://photon.komoot.io/api/?${params.toString()}`);
+  if (!resp.ok) throw new Error("No se pudo consultar Photon.");
+  const json = await resp.json();
+  return (json.features || []).filter(f => {
+    const p = f.properties || {};
+    const pais = (p.countrycode || p.country || "").toString().toLowerCase();
+    return !pais || pais === "pe" || pais.includes("peru") || pais.includes("perú");
+  });
+}
+
+async function consultarNominatimManual(texto) {
+  const params = new URLSearchParams({
+    q: texto,
+    format: "jsonv2",
+    limit: "1",
+    countrycodes: "pe",
+    addressdetails: "1"
+  });
+  const resp = await fetch(`https://nominatim.openstreetmap.org/search?${params.toString()}`, {
+    headers: { "Accept": "application/json" }
+  });
+  if (!resp.ok) throw new Error("No se pudo consultar Nominatim.");
+  const json = await resp.json();
+  if (!json.length) return [];
+  return json.map(item => ({
+    geometry: { coordinates: [parseFloat(item.lon), parseFloat(item.lat)] },
+    properties: {
+      name: item.name || item.display_name,
+      city: item.address && (item.address.city || item.address.town || item.address.district),
+      state: item.address && item.address.state,
+      country: item.address && item.address.country,
+      countrycode: item.address && item.address.country_code,
+      display_name: item.display_name
+    }
+  }));
+}
+
+function manejarInputPhoton() {
+  const texto = obtenerTextoDireccionGoogle();
+  clearTimeout(photonTimer);
+
+  if (texto.length < 3) {
+    ocultarSugerenciasPhoton();
+    return;
+  }
+
+  photonTimer = setTimeout(async () => {
+    try {
+      estadoGoogleDireccion("Buscando sugerencias en OpenStreetMap...", "");
+      const features = await consultarPhoton(texto, 6);
+      pintarSugerenciasPhoton(features);
+      estadoGoogleDireccion(features.length ? "Elige una sugerencia o presiona buscar." : "Sin sugerencias. Prueba con distrito o avenida.", features.length ? "" : "warn");
+    } catch (err) {
+      console.error("Error Photon:", err);
+      estadoGoogleDireccion("No se pudieron cargar sugerencias. Puedes abrir Google Maps.", "err");
+      ocultarSugerenciasPhoton();
+    }
+  }, 350);
+}
+
+function seleccionarSugerenciaPhoton(idx) {
+  const feature = photonSugerencias[idx];
+  if (!feature || !feature.geometry || !feature.geometry.coordinates) return;
+  const [lon, lat] = feature.geometry.coordinates;
+  const txt = textoLugarPhoton(feature);
+  const input = document.getElementById("googleDireccionInput");
+  if (input) input.value = [txt.principal, txt.detalle].filter(Boolean).join(", ");
+  ocultarSugerenciasPhoton();
+  pintarResultadoDireccionGoogle(lat, lon, txt.principal, txt.detalle);
+  estadoGoogleDireccion(`Encontrado: <b>${escapeHtml(txt.principal)}</b>`, "ok");
+}
+
+async function buscarDireccionPhoton() {
+  const texto = obtenerTextoDireccionGoogle();
+  if (!texto) {
+    alert("Escribe una direccion o lugar para buscar.");
+    return;
+  }
+
+  try {
+    estadoGoogleDireccion("Buscando direccion en OpenStreetMap...", "");
+    let features = [];
+    try {
+      features = await consultarPhoton(texto, 1);
+    } catch (errPhoton) {
+      console.warn("Photon no disponible, probando busqueda manual:", errPhoton);
+      features = await consultarNominatimManual(texto);
+    }
+    if (!features.length) features = await consultarNominatimManual(texto);
+    if (!features.length) {
+      estadoGoogleDireccion("No se encontro en OpenStreetMap. Puedes abrirlo en Google Maps.", "warn");
+      abrirGoogleMapsBusquedaDireccion();
+      return;
+    }
+    photonSugerencias = features;
+    seleccionarSugerenciaPhoton(0);
+  } catch (err) {
+    console.error("Error busqueda Photon:", err);
+    estadoGoogleDireccion("No se pudo buscar en OpenStreetMap. Abriendo Google Maps.", "err");
+    abrirGoogleMapsBusquedaDireccion();
+  }
+}
+
+function cargarGoogleMapsSiNecesario() {
+  if (!GOOGLE_MAPS_API_KEY) {
+    return Promise.reject(new Error("FALTA_API_KEY"));
+  }
+  if (googleMapsCargado && window.google && google.maps) return Promise.resolve();
+  if (googleMapsCargandoPromise) return googleMapsCargandoPromise;
+
+  googleMapsCargandoPromise = new Promise((resolve, reject) => {
+    const callbackName = "initGoogleMapsPluz_" + Date.now();
+    window[callbackName] = () => {
+      googleMapsCargado = true;
+      googleGeocoder = new google.maps.Geocoder();
+      googleStreetViewService = new google.maps.StreetViewService();
+      inicializarAutocompleteGoogle();
+      delete window[callbackName];
+      resolve();
+    };
+
+    const script = document.createElement("script");
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(GOOGLE_MAPS_API_KEY)}&libraries=places&callback=${callbackName}`;
+    script.async = true;
+    script.defer = true;
+    script.onerror = () => {
+      delete window[callbackName];
+      googleMapsCargandoPromise = null;
+      reject(new Error("No se pudo cargar Google Maps."));
+    };
+    document.head.appendChild(script);
+  });
+
+  return googleMapsCargandoPromise;
+}
+
+function inicializarGoogleDireccionSiTieneKey() {
+  if (!GOOGLE_MAPS_API_KEY) return;
+  cargarGoogleMapsSiNecesario()
+    .then(() => estadoGoogleDireccion("Google Maps listo: busqueda integrada y Street View activos.", "ok"))
+    .catch(err => {
+      console.error("No se pudo inicializar Google Maps:", err);
+      estadoGoogleDireccion("No se pudo inicializar Google Maps. Revisa la API key.", "err");
+    });
+}
+
+function inicializarAutocompleteGoogle() {
+  const input = document.getElementById("googleDireccionInput");
+  if (!input || !window.google || !google.maps || !google.maps.places || googleAutocomplete) return;
+
+  googleAutocomplete = new google.maps.places.Autocomplete(input, {
+    componentRestrictions: { country: "pe" },
+    fields: ["formatted_address", "geometry", "name"]
+  });
+
+  googleAutocomplete.addListener("place_changed", () => {
+    const place = googleAutocomplete.getPlace();
+    if (!place || !place.geometry || !place.geometry.location) {
+      estadoGoogleDireccion("Selecciona una direccion valida de la lista.", "warn");
+      return;
+    }
+    const lat = place.geometry.location.lat();
+    const lon = place.geometry.location.lng();
+    const titulo = place.name || "Direccion Google";
+    const direccion = place.formatted_address || obtenerTextoDireccionGoogle();
+    pintarResultadoDireccionGoogle(lat, lon, titulo, direccion);
+    estadoGoogleDireccion(`Encontrado: <b>${escapeHtml(direccion || titulo)}</b>`, "ok");
+    mostrarStreetViewGoogle(lat, lon, direccion || titulo);
+  });
+}
+
+function guardarUltimoPuntoGoogle(lat, lon, etiqueta = "Punto seleccionado") {
+  ultimoPuntoGoogle = { lat: Number(lat), lon: Number(lon), etiqueta };
+}
+
+function puntoActualParaStreetView() {
+  if (ultimoPuntoGoogle) return ultimoPuntoGoogle;
+  if (ultimoEncontro) return { lat: ultimoEncontro.lat, lon: ultimoEncontro.lon, etiqueta: `Cliente ${ultimoEncontro.cliente || ""}`.trim() };
+  if (ultimaSED) return { lat: ultimaSED.lat, lon: ultimaSED.lon, etiqueta: `SED ${ultimaSED.sed || ""}`.trim() };
+  return null;
+}
+
+function pintarResultadoDireccionGoogle(lat, lon, titulo, direccion) {
+  guardarUltimoPuntoGoogle(lat, lon, titulo || direccion || "Direccion Google");
+  guardarReferenciaSed(lat, lon, titulo || direccion || "Direccion");
+
+  if (marcadorGoogleDireccion) map.removeLayer(marcadorGoogleDireccion);
+  marcadorGoogleDireccion = L.marker([lat, lon], { title: titulo || direccion || "Direccion Google" }).addTo(map);
+  marcadorGoogleDireccion.bindPopup(`
+    <b>${escapeHtml(titulo || "Direccion encontrada")}</b><br>
+    ${escapeHtml(direccion || "")}<br>
+    <button class="btn btn-sm btn-outline-primary mt-2" onclick="mostrarStreetViewGoogle(${lat}, ${lon}, '${escapeHtml(titulo || "Street View").replace(/'/g, "\\'")}')">Street View</button>
+  `).openPopup();
+  map.setView([lat, lon], 18, { animate: true });
+}
+
+async function buscarDireccionGoogle() {
+  const direccion = obtenerTextoDireccionGoogle();
+  if (!direccion) {
+    alert("Escribe una direccion o lugar para buscar.");
+    return;
+  }
+
+  if (!GOOGLE_MAPS_API_KEY) {
+    estadoGoogleDireccion("Sin API key configurada. Abriendo Google Maps en otra pestana.", "warn");
+    abrirGoogleMapsBusquedaDireccion();
+    return;
+  }
+
+  try {
+    estadoGoogleDireccion("Buscando direccion en Google...", "");
+    await cargarGoogleMapsSiNecesario();
+    const request = { address: direccion, region: "pe" };
+    googleGeocoder.geocode(request, (results, status) => {
+      if (status !== "OK" || !results || !results.length) {
+        estadoGoogleDireccion("No se encontro la direccion en Google.", "err");
+        return;
+      }
+      const result = results[0];
+      const loc = result.geometry.location;
+      const lat = loc.lat();
+      const lon = loc.lng();
+      pintarResultadoDireccionGoogle(lat, lon, "Direccion Google", result.formatted_address);
+      estadoGoogleDireccion(`Encontrado: <b>${escapeHtml(result.formatted_address)}</b>`, "ok");
+      mostrarStreetViewGoogle(lat, lon, result.formatted_address);
+    });
+  } catch (err) {
+    if (err.message === "FALTA_API_KEY") {
+      estadoGoogleDireccion("Sin API key configurada. Abriendo Google Maps en otra pestana.", "warn");
+      abrirGoogleMapsBusquedaDireccion();
+    } else {
+      console.error("Error Google Maps:", err);
+      estadoGoogleDireccion("No se pudo usar Google Maps integrado. Se abrira Google Maps web.", "err");
+      abrirGoogleMapsBusquedaDireccion();
+    }
+  }
+}
+
+async function mostrarStreetViewGoogle(lat, lon, titulo = "Street View") {
+  guardarUltimoPuntoGoogle(lat, lon, titulo);
+
+  if (!GOOGLE_MAPS_API_KEY) {
+    estadoGoogleDireccion("Sin API key: abriendo Street View en Google Maps.", "warn");
+    abrirGoogleStreetViewWeb(lat, lon);
+    return;
+  }
+
+  try {
+    await cargarGoogleMapsSiNecesario();
+    const panel = document.getElementById("panelStreetViewGoogle");
+    const canvas = document.getElementById("streetViewGoogleCanvas");
+    const fallback = document.getElementById("streetViewGoogleFallback");
+    const tituloEl = document.getElementById("streetViewGoogleTitulo");
+    if (!panel || !canvas) return;
+
+    if (tituloEl) tituloEl.textContent = titulo || "Street View";
+    panel.classList.add("visible");
+    canvas.style.display = "block";
+    if (fallback) fallback.style.display = "none";
+
+    const position = { lat: Number(lat), lng: Number(lon) };
+    googleStreetViewService.getPanorama({ location: position, radius: 80 }, (data, status) => {
+      if (status !== "OK") {
+        canvas.style.display = "none";
+        if (fallback) {
+          fallback.style.display = "block";
+          fallback.innerHTML = `No hay Street View cercano para este punto.<br><button class="btn btn-outline-primary btn-sm mt-2" onclick="abrirGoogleStreetViewWeb(${lat}, ${lon})">Abrir en Google Maps</button>`;
+        }
+        return;
+      }
+
+      googleStreetViewPanorama = new google.maps.StreetViewPanorama(canvas, {
+        pano: data.location.pano,
+        pov: { heading: 0, pitch: 0 },
+        zoom: 1,
+        addressControl: true,
+        fullscreenControl: true
+      });
+    });
+  } catch (err) {
+    console.error("Error Street View:", err);
+    abrirGoogleStreetViewWeb(lat, lon);
+  }
+}
+
+function mostrarStreetViewUltimoPunto() {
+  const punto = puntoActualParaStreetView();
+  if (!punto) {
+    alert("Primero busca un suministro, SED, coordenada o direccion.");
+    return;
+  }
+  mostrarStreetViewGoogle(punto.lat, punto.lon, punto.etiqueta || "Street View");
+}
 function toggleSidebar(){ sidebar.classList.toggle("hidden"); }
 </script>
 <script>
@@ -2947,7 +3692,7 @@ function buscarSuministro() {
 
     verEnGoogle.style.display = "inline";
     actualizarMapa(encontrado.lat, encontrado.lon, encontrado);
-    mostrarAtenciones(encontrado.cliente);
+    ultimoClienteBuscadoAtenciones = encontrado.cliente;
 
     // mostrar cercanos
     const cercanos = obtenerCercanos(encontrado.lat, encontrado.lon);
@@ -3010,6 +3755,8 @@ if (!btnDetalle) {
   btnDetalle.style.display = "inline";
 }
     marker = L.marker([encontrado.lat, encontrado.lon],{title:"SED "+encontrado.sed}).addTo(map);
+    guardarUltimoPuntoGoogle(encontrado.lat, encontrado.lon, `SED ${encontrado.sed || ""}`.trim());
+    guardarReferenciaSed(encontrado.lat, encontrado.lon, `SED ${encontrado.sed || ""}`.trim());
     marker.bindTooltip(`SED: ${encontrado.sed}<br>ALIM: ${encontrado.alim}<br>Contratista: ${nombreContratistaPorAlim(encontrado.alim, encontrado.sed)}<br>UT: ${encontrado.ut}`).openTooltip();
     map.setView([encontrado.lat, encontrado.lon], 17);
 marker.on("click", () => {
@@ -3074,6 +3821,10 @@ function buscarPorCoordenadas() {
     if (!isNaN(lat) && !isNaN(lon)) {
       resultadoCoord.textContent = "✅ Coordenadas válidas";
       marker = L.marker([lat, lon],{title:"Ubicación"}).addTo(map);
+      guardarUltimoPuntoGoogle(lat, lon, "Coordenadas");
+      ultimaCoordenadaBusqueda = { lat, lon, etiqueta: "Coordenadas" };
+      guardarReferenciaSed(lat, lon, "Coordenadas");
+      if (sedVisible) pintarSEDsCercanas(lat, lon);
       map.setView([lat, lon], 17);
 
       const cercanos = obtenerCercanos(lat, lon);
@@ -3117,8 +3868,48 @@ function buscarPorCoordenadas() {
 // --- TOGGLE PANEL HERRAMIENTAS ---
 const btnHerramientas = document.getElementById("toggleHerramientasBtn");
 const panelHerramientas = document.getElementById("panelHerramientas");
+const btnMaps = document.getElementById("toggleMapsBtn");
+const panelMaps = document.getElementById("panelMaps");
+const btnTickets = document.getElementById("toggleTicketsBtn");
+const panelTickets = document.getElementById("panelTickets");
+
+function cerrarPanelBoton(panel, btn, texto, claseBase = "btn-primary") {
+  if (!panel || !btn) return;
+  panel.classList.remove("visible");
+  btn.textContent = texto;
+  btn.classList.remove("btn-danger");
+  btn.classList.add(claseBase);
+}
+
+function cerrarPanelesFlotantes(excepto = null) {
+  if (excepto !== "herramientas") cerrarPanelBoton(panelHerramientas, btnHerramientas, "🛠️ Herramientas");
+  if (excepto !== "maps") cerrarPanelBoton(panelMaps, btnMaps, "Maps");
+  if (excepto !== "tickets") cerrarPanelBoton(panelTickets, btnTickets, "Tickets");
+  if (excepto !== "atenciones" && typeof btnAtenciones !== "undefined" && typeof panelAtenciones !== "undefined") {
+    cerrarPanelBoton(panelAtenciones, btnAtenciones, "📋 Atenciones", "btn-secondary");
+  }
+}
+
+function alternarPanelFlotante(nombre, panel, btn, textoAbierto, textoCerrado) {
+  if (!panel || !btn) return;
+  const abrir = !panel.classList.contains("visible");
+  cerrarPanelesFlotantes(nombre);
+  if (abrir) {
+    panel.classList.add("visible");
+    btn.textContent = textoAbierto;
+    btn.classList.remove("btn-primary");
+    btn.classList.add("btn-danger");
+  } else {
+    panel.classList.remove("visible");
+    btn.textContent = textoCerrado;
+    btn.classList.remove("btn-danger");
+    btn.classList.add("btn-primary");
+  }
+}
 
 btnHerramientas.addEventListener("click", () => {
+  alternarPanelFlotante("herramientas", panelHerramientas, btnHerramientas, "❌ Cerrar", "🛠️ Herramientas");
+  return;
   panelHerramientas.classList.toggle("visible");
 
   if (panelHerramientas.classList.contains("visible")) {
@@ -3131,11 +3922,28 @@ btnHerramientas.addEventListener("click", () => {
     btnHerramientas.classList.add("btn-primary");
   }
 });
+if (btnMaps) {
+  btnMaps.addEventListener("click", () => {
+    alternarPanelFlotante("maps", panelMaps, btnMaps, "❌ Cerrar Maps", "Maps");
+  });
+}
+if (btnTickets) {
+  btnTickets.addEventListener("click", () => {
+    alternarPanelFlotante("tickets", panelTickets, btnTickets, "❌ Cerrar Tickets", "Tickets");
+  });
+}
 const btnAtenciones = document.getElementById("toggleAtencionesBtn");
 const panelAtenciones = document.getElementById("panelAtenciones");
 
 btnAtenciones.addEventListener("click", () => {
-  panelAtenciones.classList.toggle("visible");
+  const vaAbrir = !panelAtenciones.classList.contains("visible");
+  if (vaAbrir) cerrarPanelesFlotantes("atenciones");
+
+  if (vaAbrir && ultimoClienteBuscadoAtenciones) {
+    mostrarAtenciones(ultimoClienteBuscadoAtenciones);
+  } else {
+    panelAtenciones.classList.toggle("visible");
+  }
 
   if (panelAtenciones.classList.contains("visible")) {
     btnAtenciones.textContent = "❌ Cerrar";
