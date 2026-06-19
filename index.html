@@ -497,6 +497,7 @@ body.modo-oscuro-mapa .leaflet-control-attribution {
         <button id="btnCruzar3ArchivosMapa" class="btn btn-primary btn-sm w-100 mb-2">🔍 Cruzar y pintar mapa</button>
         <button id="btnExportarCruceMapaExcel" class="btn btn-success btn-sm w-100 mb-2" style="display:none;">📊 Descargar Excel cruce</button>
         <button id="btnExportarActivosJsonRepo" class="btn btn-outline-primary btn-sm w-100 mb-2" style="display:none;">🌐 Descargar data online JSON</button>
+        <button id="btnExportarDashboardCruceHtml" class="btn btn-dark btn-sm w-100 mb-2" style="display:none;">Dashboard HTML cruce</button>
         <div id="estadoCruceMapa" class="cruce-mini">Sube los 3 archivos para generar el cruce y pintar los activos.</div>
       </div>
       <div class="small text-muted">
@@ -617,6 +618,7 @@ const cruceCallsInput = document.getElementById("cruceCallsInput");
 const cruceFsmInput = document.getElementById("cruceFsmInput");
 const btnCruzar3ArchivosMapa = document.getElementById("btnCruzar3ArchivosMapa");
 const btnExportarCruceMapaExcel = document.getElementById("btnExportarCruceMapaExcel");
+const btnExportarDashboardCruceHtml = document.getElementById("btnExportarDashboardCruceHtml");
 const btnExportarActivosJsonRepo = document.getElementById("btnExportarActivosJsonRepo");
 const estadoCruceMapa = document.getElementById("estadoCruceMapa");
 const googleDireccionInput = document.getElementById("googleDireccionInput");
@@ -647,6 +649,9 @@ if (btnCruzar3ArchivosMapa) {
 }
 if (btnExportarCruceMapaExcel) {
   btnExportarCruceMapaExcel.addEventListener("click", exportarCruceMapaExcel);
+}
+if (btnExportarDashboardCruceHtml) {
+  btnExportarDashboardCruceHtml.addEventListener("click", exportarDashboardCruceHtml);
 }
 if (btnExportarActivosJsonRepo) {
   btnExportarActivosJsonRepo.addEventListener("click", exportarActivosJsonRepositorio);
@@ -2613,7 +2618,7 @@ function ejecutarCruce3Archivos() {
     const hasActiveOdm = !!(fsmItem && fsmItem.active);
     const phone = callRow ? (cruceCleanPhone(cruceV(callRow, cruceCallCols.telLlamante)) || cruceCleanPhone(cruceV(callRow, cruceCallCols.telefono))) : "";
     const horaLlamada = callRow ? (cruceV(callRow, cruceCallCols.horaRegistro) || cruceV(callRow, cruceCallCols.horaAveria)) : "";
-    const fsmDetail = fsmMatches.slice(0, 8).map(x => (x.orden || "—") + " (" + (x.estado || "—") + ")").join("\n");
+    const fsmDetail = fsmMatches.map(x => (x.orden || "-") + " (" + (x.estado || "-") + ")" + (x.textoBreve ? " - " + x.textoBreve : "")).join("\n");
     const horaInicio = cruceV(t, cruceTicketCols.horaInicio);
     const setTicket = cruceV(t, cruceTicketCols.set);
     const objetoTecnico = cruceV(t, cruceTicketCols.objetoTecnico);
@@ -2785,6 +2790,7 @@ async function cruzar3ArchivosYPintarMapa() {
     estadoCruce(`✅ Cruce listo: ${resultados.length} tickets evaluados · ${conCoord} pintados · ${observados} observados`, "ok");
 
     if (btnExportarCruceMapaExcel) btnExportarCruceMapaExcel.style.display = "block";
+    if (btnExportarDashboardCruceHtml) btnExportarDashboardCruceHtml.style.display = "block";
     if (btnExportarActivosJsonRepo) btnExportarActivosJsonRepo.style.display = "block";
   } catch (err) {
     console.error("❌ Error en cruce integrado:", err);
@@ -2843,6 +2849,223 @@ function exportarCruceMapaExcel() {
   wsResumen["!cols"] = [{ wch: 22 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 14 }, { wch: 12 }, { wch: 14 }];
   XLSX.utils.book_append_sheet(wb, wsResumen, "RESUMEN");
   XLSX.writeFile(wb, "Cruce_3_Excel_Tickets_Llamadas_FSM.xlsx");
+}
+
+function cruceDashboardFechaIso(ms) {
+  if (!ms || isNaN(ms)) return "";
+  const d = new Date(ms);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function cruceDashboardRangoHoras(horas) {
+  if (horas === null || isNaN(horas)) return { id: "sin_fecha", label: "Sin fecha" };
+  if (horas < 4) return { id: "0_4", label: "0 a 4" };
+  if (horas < 8) return { id: "4_8", label: "4 a 8" };
+  if (horas < 12) return { id: "8_12", label: "8 a 12" };
+  if (horas < 16) return { id: "12_16", label: "12 a 16" };
+  if (horas < 24) return { id: "16_24", label: "16 a 24" };
+  return { id: "24_mas", label: "24 a mas" };
+}
+
+function cruceDashboardCoordInfo(valor) {
+  const txt = String(valor || "").trim();
+  const nums = txt.match(/-?\d+(?:[.,]\d+)?/g);
+  if (!nums || nums.length < 2) return { texto: txt, lat: "", lon: "", mapsUrl: "" };
+  let a = parseFloat(nums[0].replace(",", "."));
+  let b = parseFloat(nums[1].replace(",", "."));
+  if (!isFinite(a) || !isFinite(b)) return { texto: txt, lat: "", lon: "", mapsUrl: "" };
+  let lat = a;
+  let lon = b;
+  if (Math.abs(a) > 90 && Math.abs(b) <= 90) {
+    lon = a;
+    lat = b;
+  }
+  if (Math.abs(lat) > 90 || Math.abs(lon) > 180) return { texto: txt, lat: "", lon: "", mapsUrl: "" };
+  return {
+    texto: `${lat.toFixed(6)}, ${lon.toFixed(6)}`,
+    lat,
+    lon,
+    mapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(lat + "," + lon)}`
+  };
+}
+
+function cruceDashboardRows() {
+  const ahoraMs = Date.now();
+  return cruceResults.map(r => {
+    const inicioMs = cruceParseDateMs(r.horaInicio);
+    const horas = inicioMs ? Math.max(0, (ahoraMs - inicioMs) / 3600000) : null;
+    const rango = cruceDashboardRangoHoras(horas);
+    const contratista = r.contratistaSet || r.contratista || r.ptoResponsable || "SIN ASIGNAR";
+    const coordInfo = cruceDashboardCoordInfo(r.coordenadas || `${r.latitudBase || ""}, ${r.longitudBase || ""}`);
+    return {
+      ticket: r.ticket || "",
+      estadoTicket: r.estadoTicket || "",
+      horaInicio: r.horaInicio || "",
+      fechaInicio: cruceDashboardFechaIso(inicioMs),
+      horas: horas === null ? "" : Number(horas.toFixed(2)),
+      rangoId: rango.id,
+      rango: rango.label,
+      contratista,
+      odm: r.odm || "",
+      estadoOdm: r.estadoOdm || "",
+      cruceOdm: r.hasActiveOdm ? "CON ODM ACTIVA" : (r.hasFsm ? (cruceFsmTokens(r.estadoOdm).includes("REA") ? "ODM CERRADA" : "ODM NO ACTIVA") : "SIN REGISTRO FSM"),
+      odmActiva: r.hasActiveOdm ? "SI" : "NO",
+      totalOdmsFsm: r.totalOdmsFsm || 0,
+      detalleOdmsFsm: r.detalleOdmsFsm || "",
+      textoBreveFsm: r.textoBreveFsm || "",
+      ptoResponsable: r.ptoResponsable || "",
+      nivelTensionFsm: r.nivelTensionFsm || "",
+      tipoResumen: r.tipoResumen || "SIN CLASIFICAR",
+      tipoEvento: r.tipoResumen || "SIN CLASIFICAR",
+      asignadoOdm: r.hasActiveOdm ? "SI" : "NO",
+      objetoTecnico: r.objetoTecnico || "",
+      set: r.setTicket || "",
+      alimentador: r.alimentador || "",
+      sed: r.sed || "",
+      distrito: r.distrito || r.distritoLlamada || "",
+      direccion: r.direccionContacto || r.direccionTicket || "",
+      suministro: r.suministro || "",
+      aviso: r.aviso || "",
+      horaLlamada: r.horaLlamada || "",
+      llamante: r.llamante || "",
+      numeroCelular: r.numeroCelular || "",
+      telLlamante: r.telLlamante || "",
+      telefonoCliente: r.telefonoCliente || "",
+      coordenadas: coordInfo.texto,
+      latitud: coordInfo.lat,
+      longitud: coordInfo.lon,
+      mapsUrl: coordInfo.mapsUrl,
+      prioridad: r.prioridad || "",
+      tieneLlamada: r.hasCall ? "SI" : "NO"
+    };
+  }).sort((a, b) => (Number(b.horas) || -1) - (Number(a.horas) || -1));
+}
+
+function construirDashboardCruceHtml() {
+  const rows = cruceDashboardRows();
+  const payload = JSON.stringify(rows).replace(/<\//g, "<\\/");
+  const generado = new Date().toLocaleString("es-PE");
+  return `<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard tickets activos</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"><\/script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"><\/script>
+<style>
+:root{--bg:#f4f6f8;--card:#fff;--txt:#172033;--mut:#667085;--line:#d7dde5;--blue:#0d6efd;--green:#168a4a;--red:#d92d20}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--txt);font-family:Arial,Helvetica,sans-serif;font-size:14px}
+header{padding:18px 22px;background:#101828;color:white}h1{font-size:22px;margin:0 0 4px}header p{margin:0;color:#cbd5e1}
+.wrap{padding:16px 20px}.kpis{display:grid;grid-template-columns:repeat(4,minmax(140px,1fr));gap:10px;margin-bottom:12px}
+.kpi,.card{background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:0 1px 2px rgba(16,24,40,.06)}
+.kpi{padding:12px}.kpi b{display:block;font-size:24px}.kpi span{color:var(--mut);font-size:12px}
+.filters{display:grid;grid-template-columns:repeat(7,minmax(130px,1fr));gap:8px;margin-bottom:12px}.filters input,.filters select{width:100%;padding:8px;border:1px solid var(--line);border-radius:6px;background:white}
+.eventBanner{display:none;margin:0 0 12px;padding:14px 16px;border-radius:8px;background:#eaf2ff;border:1px solid #bcd7ff;color:#0b3b78;font-size:26px;font-weight:800;letter-spacing:0}
+.eventBanner span{display:block;font-size:11px;text-transform:uppercase;color:#4b6f9f;margin-bottom:2px}
+.grid{display:grid;grid-template-columns:1.15fr .85fr;gap:12px;margin-bottom:12px}.card{padding:12px}.card h2{font-size:15px;margin:0 0 10px}
+.chartBox{height:300px;position:relative}.actions{display:flex;gap:8px;align-items:center;justify-content:space-between;margin:10px 0}.btn{border:0;border-radius:6px;padding:9px 12px;font-weight:700;cursor:pointer}.btn-blue{background:var(--blue);color:white}.btn-light{background:white;border:1px solid var(--line)}
+.tableWrap{background:white;border:1px solid var(--line);border-radius:8px;overflow:auto;max-height:58vh}table{border-collapse:collapse;width:100%;min-width:1900px}th,td{padding:8px;border-bottom:1px solid #edf0f3;text-align:left;vertical-align:top}th{position:sticky;top:0;background:#f8fafc;z-index:1;font-size:12px}td{font-size:12px}.mono{font-family:Consolas,monospace;font-weight:700}.muted{color:var(--mut)}.badge{display:inline-block;border-radius:999px;padding:3px 8px;font-size:11px;font-weight:700}.ok{background:#dcfce7;color:#166534}.warn{background:#fef3c7;color:#92400e}.bad{background:#fee2e2;color:#991b1b}.maplink{color:#0d6efd;font-weight:700;text-decoration:none}.maplink:hover{text-decoration:underline}
+@media(max-width:900px){.kpis,.filters,.grid{grid-template-columns:1fr}.wrap{padding:12px}header{padding:14px}.tableWrap{max-height:60vh}}
+</style>
+</head>
+<body>
+<header><h1>Dashboard tickets activos</h1><p>Cruce Tickets activos + Fallo cliente + Export FSM · Generado ${generado}</p></header>
+<main class="wrap">
+  <section class="kpis">
+    <div class="kpi"><b id="kTotal">0</b><span>Tickets filtrados</span></div>
+    <div class="kpi"><b id="kMas24">0</b><span>Tickets 24 h a mas</span></div>
+    <div class="kpi"><b id="kOdmActiva">0</b><span>Con ODM activa</span></div>
+    <div class="kpi"><b id="kSinFsm">0</b><span>Sin registro FSM</span></div>
+  </section>
+  <section class="filters">
+    <input id="fBuscar" placeholder="Buscar ticket, ODM, SED, distrito...">
+    <select id="fContratista"><option value="">Todas las contratistas</option></select>
+    <select id="fTipoEvento"><option value="">Todos los tipos de evento</option></select>
+    <select id="fRango"><option value="">Todos los rangos</option></select>
+    <select id="fOdm"><option value="">Todos los estados ODM</option></select>
+    <input id="fDesde" type="date">
+    <input id="fHasta" type="date">
+  </section>
+  <div class="eventBanner" id="eventBanner"><span>Tipo de evento filtrado</span><b id="eventName"></b></div>
+  <section class="grid">
+    <div class="card"><h2>Horas de atencion activas · asignados vs pendientes</h2><div class="chartBox"><canvas id="chRangos"></canvas></div></div>
+    <div class="card"><h2>Atenciones activas por contratista</h2><div class="chartBox"><canvas id="chContratista"></canvas></div></div>
+  </section>
+  <div class="actions">
+    <div class="muted" id="resumenVista">0 tickets</div>
+    <div><button class="btn btn-light" onclick="limpiarFiltros()">Limpiar filtros</button> <button class="btn btn-blue" onclick="exportarVistaExcel()">Exportar vista Excel</button></div>
+  </div>
+  <section class="tableWrap"><table><thead><tr>
+    <th>Ticket</th><th>Tipo evento</th><th>Rango</th><th>Horas</th><th>Inicio</th><th>Contratista</th><th>Estado ticket</th><th>Llamante</th><th>Telefono</th><th>Aviso</th><th>Suministro</th><th>Hora llamada</th><th>Coordenadas</th><th>Maps</th><th>ODM</th><th>Estado ODM</th><th>Cruce ODM</th><th>Total ODMs</th><th>Detalle ODMs FSM</th><th>SED</th><th>Alimentador</th><th>Distrito</th><th>Direccion</th>
+  </tr></thead><tbody id="tbody"></tbody></table></section>
+</main>
+<script>
+const DATA = ${payload};
+const RANGOS = [{id:"0_4",label:"0 a 4"},{id:"4_8",label:"4 a 8"},{id:"8_12",label:"8 a 12"},{id:"12_16",label:"12 a 16"},{id:"16_24",label:"16 a 24"},{id:"24_mas",label:"24 a mas"},{id:"sin_fecha",label:"Sin fecha"}];
+let chRangos=null,chContratista=null, vista=[];
+const VALUE_LABEL_PLUGIN={id:"valueLabel",afterDatasetsDraw:function(chart){const ctx=chart.ctx,area=chart.chartArea;ctx.save();ctx.font="700 11px Arial";ctx.textBaseline="middle";chart.data.datasets.forEach(function(ds,di){const meta=chart.getDatasetMeta(di);meta.data.forEach(function(el,i){const val=ds.data[i];if(!val)return;const p=el.tooltipPosition();ctx.fillStyle="#fff";ctx.strokeStyle="rgba(0,0,0,.28)";ctx.lineWidth=3;if(chart.options.indexAxis==="y"){const x=Math.max(Math.min((el.x+el.base)/2,area.right-14),area.left+14);ctx.textAlign="center";ctx.strokeText(val,x,p.y);ctx.fillText(val,x,p.y);}else{const h=Math.abs(el.y-el.base);const y=h>=18?Math.min(el.y+h/2,area.bottom-9):Math.max(el.y-9,area.top+9);ctx.textAlign="center";if(h>=18){ctx.strokeText(val,p.x,y);ctx.fillText(val,p.x,y);}else{ctx.fillStyle="#111827";ctx.fillText(val,p.x,y);}}});});ctx.restore();}};
+try{Chart.register(VALUE_LABEL_PLUGIN);}catch(e){}
+function esc(v){return String(v==null?"":v).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;","\\"":"&quot;","'":"&#39;"}[c];});}
+function uniq(a){return Array.from(new Set(a.filter(Boolean))).sort(function(x,y){return String(x).localeCompare(String(y));});}
+function fillSelect(id, vals){const s=document.getElementById(id); vals.forEach(function(v){const o=document.createElement("option");o.value=v;o.textContent=v;s.appendChild(o);});}
+function init(){fillSelect("fContratista",uniq(DATA.map(function(x){return x.contratista;}))); fillSelect("fTipoEvento",uniq(DATA.map(function(x){return x.tipoEvento||x.tipoResumen;}))); fillSelect("fRango",RANGOS.map(function(x){return x.label;})); fillSelect("fOdm",uniq(DATA.map(function(x){return x.cruceOdm;}))); document.querySelectorAll(".filters input,.filters select").forEach(function(el){el.addEventListener("input",render);el.addEventListener("change",render);}); render();}
+function filtrados(){
+ const q=document.getElementById("fBuscar").value.trim().toLowerCase(), c=document.getElementById("fContratista").value, te=document.getElementById("fTipoEvento").value, r=document.getElementById("fRango").value, o=document.getElementById("fOdm").value, d=document.getElementById("fDesde").value, h=document.getElementById("fHasta").value;
+ return DATA.filter(function(x){
+  if(c && x.contratista!==c) return false; if(te && (x.tipoEvento||x.tipoResumen)!==te) return false; if(r && x.rango!==r) return false; if(o && x.cruceOdm!==o) return false; if(d && (!x.fechaInicio || x.fechaInicio<d)) return false; if(h && (!x.fechaInicio || x.fechaInicio>h)) return false;
+  if(q){const blob=[x.ticket,x.odm,x.estadoOdm,x.detalleOdmsFsm,x.contratista,x.tipoEvento,x.tipoResumen,x.sed,x.alimentador,x.distrito,x.direccion,x.suministro,x.aviso,x.llamante,x.numeroCelular,x.telLlamante,x.telefonoCliente,x.coordenadas].join(" ").toLowerCase(); if(!blob.includes(q)) return false;}
+  return true;
+ });
+}
+function countBy(rows, field){const out={}; rows.forEach(function(x){const k=x[field]||"SIN DATO"; out[k]=(out[k]||0)+1;}); return out;}
+function render(){
+ vista=filtrados();
+ document.getElementById("kTotal").textContent=vista.length;
+ document.getElementById("kMas24").textContent=vista.filter(function(x){return x.rangoId==="24_mas";}).length;
+ document.getElementById("kOdmActiva").textContent=vista.filter(function(x){return x.odmActiva==="SI";}).length;
+ document.getElementById("kSinFsm").textContent=vista.filter(function(x){return x.cruceOdm==="SIN REGISTRO FSM";}).length;
+ document.getElementById("resumenVista").textContent=vista.length+" ticket(s) en la vista filtrada";
+ const tipoSel=document.getElementById("fTipoEvento").value, banner=document.getElementById("eventBanner"), eventName=document.getElementById("eventName");
+ if(tipoSel){banner.style.display="block";eventName.textContent=tipoSel;}else{banner.style.display="none";eventName.textContent="";}
+ renderTabla(); renderCharts();
+}
+function renderTabla(){
+ const tb=document.getElementById("tbody"); tb.innerHTML="";
+ vista.forEach(function(x){
+  const cls=x.odmActiva==="SI"?"ok":(x.cruceOdm==="SIN REGISTRO FSM"?"bad":"warn");
+  const tel=[x.numeroCelular,x.telLlamante,x.telefonoCliente].filter(Boolean).join(" / ");
+  const maps=x.mapsUrl ? "<a class='maplink' href='"+esc(x.mapsUrl)+"' target='_blank' rel='noopener'>Abrir</a>" : "<span class='muted'>Sin coord.</span>";
+  tb.insertAdjacentHTML("beforeend","<tr><td class='mono'>"+esc(x.ticket)+"</td><td><b>"+esc(x.tipoEvento||x.tipoResumen)+"</b></td><td>"+esc(x.rango)+"</td><td><b>"+esc(x.horas)+"</b></td><td>"+esc(x.horaInicio)+"</td><td>"+esc(x.contratista)+"</td><td>"+esc(x.estadoTicket)+"</td><td>"+esc(x.llamante||"")+"</td><td>"+esc(tel)+"</td><td>"+esc(x.aviso)+"</td><td>"+esc(x.suministro)+"</td><td>"+esc(x.horaLlamada)+"</td><td class='mono'>"+esc(x.coordenadas)+"</td><td>"+maps+"</td><td class='mono'>"+esc(x.odm||"SIN ODM")+"</td><td>"+esc(x.estadoOdm)+"</td><td><span class='badge "+cls+"'>"+esc(x.cruceOdm)+"</span></td><td>"+esc(x.totalOdmsFsm)+"</td><td style='white-space:pre-line'>"+esc(x.detalleOdmsFsm)+"</td><td>"+esc(x.sed)+"</td><td>"+esc(x.alimentador)+"</td><td>"+esc(x.distrito)+"</td><td>"+esc(x.direccion)+"</td></tr>");
+ });
+}
+function renderCharts(){
+ const labels=RANGOS.slice(0,6).map(function(x){return x.label;});
+ const asignados=labels.map(function(l){return vista.filter(function(x){return x.rango===l && x.asignadoOdm==="SI";}).length;});
+ const pendientes=labels.map(function(l){return vista.filter(function(x){return x.rango===l && x.asignadoOdm!=="SI";}).length;});
+ if(chRangos) chRangos.destroy(); chRangos=new Chart(document.getElementById("chRangos"),{type:"bar",data:{labels:labels,datasets:[{label:"Asignados con ODM",data:asignados,backgroundColor:"#16a34a"},{label:"Pendientes / sin ODM activa",data:pendientes,backgroundColor:"#f97316"}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,position:"bottom"},tooltip:{callbacks:{afterLabel:function(ctx){const i=ctx.dataIndex;return "Total rango: "+(asignados[i]+pendientes[i]);}}}},scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true,ticks:{precision:0}}}}});
+ const cc=countBy(vista,"contratista"); const pairs=Object.entries(cc).sort(function(a,b){return b[1]-a[1];});
+ if(chContratista) chContratista.destroy(); chContratista=new Chart(document.getElementById("chContratista"),{type:"bar",data:{labels:pairs.map(function(x){return x[0];}),datasets:[{label:"Activas",data:pairs.map(function(x){return x[1];}),backgroundColor:"#0d6efd"}]},options:{indexAxis:"y",responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,ticks:{precision:0}}}}});
+}
+function limpiarFiltros(){document.querySelectorAll(".filters input,.filters select").forEach(function(el){el.value="";});render();}
+function exportarVistaExcel(){
+ if(!vista.length){alert("No hay datos para exportar.");return;}
+ const rows=vista.map(function(x){return {"Ticket":x.ticket,"Tipo evento":x.tipoEvento||x.tipoResumen,"Rango horas":x.rango,"Horas atencion":x.horas,"Hora inicio":x.horaInicio,"Contratista":x.contratista,"Estado ticket":x.estadoTicket,"Asignado ODM":x.asignadoOdm,"Primer llamante":x.llamante,"Numero celular":x.numeroCelular,"Tel. llamante":x.telLlamante,"Telefono cliente":x.telefonoCliente,"Aviso":x.aviso,"Suministro":x.suministro,"Hora llamada":x.horaLlamada,"Coordenadas":x.coordenadas,"Latitud":x.latitud,"Longitud":x.longitud,"Link Google Maps":x.mapsUrl,"ODM":x.odm,"Estado ODM":x.estadoOdm,"Cruce ODM":x.cruceOdm,"ODM activa":x.odmActiva,"Total ODMs FSM":x.totalOdmsFsm,"Detalle ODMs FSM":x.detalleOdmsFsm,"SED":x.sed,"Alimentador":x.alimentador,"Distrito":x.distrito,"Direccion":x.direccion,"Prioridad":x.prioridad};});
+ const wb=XLSX.utils.book_new(); const ws=XLSX.utils.json_to_sheet(rows); ws["!cols"]=Object.keys(rows[0]).map(function(k){return {wch:Math.min(Math.max(k.length+4,12),42)};}); XLSX.utils.book_append_sheet(wb,ws,"VISTA_FILTRADA"); XLSX.writeFile(wb,"Dashboard_Tickets_Activos_Filtrado.xlsx");
+}
+init();
+<\/script>
+</body>
+</html>`;
+}
+
+function exportarDashboardCruceHtml() {
+  if (!cruceResults.length) {
+    alert("Primero genera el cruce 3 archivos.");
+    return;
+  }
+  descargarBlobTexto("Dashboard_Tickets_Activos_Cruce.html", construirDashboardCruceHtml(), "text/html;charset=utf-8");
+  estadoCruce("Dashboard HTML descargado con filtros, graficos y detalle exportable.", "ok");
 }
 
 function activosParaJsonRepositorio() {
