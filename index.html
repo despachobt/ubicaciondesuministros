@@ -53,6 +53,37 @@
   pointer-events: none; /* evita bloquear clics */
   text-align: center;
 }
+.poste-wrap {
+  width: 18px;
+  height: 18px;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  background: transparent;
+  transform: translate(-9px, -9px);
+  opacity: .95;
+}
+.poste-progress {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e9ecef;
+  margin-top: 4px;
+}
+.poste-progress > span {
+  display: block;
+  height: 100%;
+  width: 38%;
+  border-radius: inherit;
+  background: #0d6efd;
+  animation: posteLoad 1s ease-in-out infinite;
+}
+@keyframes posteLoad {
+  0% { transform: translateX(-105%); }
+  100% { transform: translateX(265%); }
+}
+.poste-ap, .poste-mt { color: #198754; }
+.poste-sp { color: #0d6efd; }
+.poste-at { color: #dc3545; }
 input[type=range] {
   accent-color: #0d6efd; /* azul bootstrap */
 }
@@ -421,6 +452,17 @@ body.modo-oscuro-mapa .leaflet-control-attribution {
   👷 Mostrar técnicos
 </button>
 
+  <div class="card mb-3">
+    <div class="card-body p-2">
+      <h6 class="mb-2">Postes por tension</h6>
+      <button id="btnPostesAP" class="btn btn-outline-success btn-sm w-100 mb-2">Mostrar postes AP</button>
+      <button id="btnPostesSP" class="btn btn-outline-primary btn-sm w-100 mb-2">Mostrar postes SP</button>
+      <button id="btnPostesMT" class="btn btn-outline-success btn-sm w-100 mb-2">Mostrar postes MT</button>
+      <button id="btnPostesAT" class="btn btn-outline-danger btn-sm w-100 mb-2">Mostrar postes AT</button>
+      <div id="estadoPostes" class="small text-muted">Postes desactivados.</div>
+    </div>
+  </div>
+
   <button id="btnModoOscuroMapa" class="btn btn-dark btn-sm w-100 mb-2">
     Modo oscuro
   </button>
@@ -555,6 +597,9 @@ let ultimoClienteBuscadoAtenciones = null;
 let photonSugerencias = [];
 let photonTimer = null;
 const RADIO_VISUAL_SED = 1000; // metros
+const RADIO_VISUAL_POSTES = 200; // metros
+const MAX_POSTES_RENDER = 120;
+let ultimaReferenciaPostes = null;
 // ============================
 // 📏 COMPARAR DISTANCIAS
 // ============================
@@ -575,6 +620,22 @@ let capaTecnicos = L.layerGroup();
 let tecnicosVisible = false;
 let markersTecnicos = {};
 let tecnicosData = {};
+
+// ============================
+// CAPAS POSTES AP/SP/MT/AT
+// ============================
+const POSTES_CONFIG = {
+  AP: { nombre: "AP", color: "#198754", clase: "poste-ap", url: "https://dl.dropboxusercontent.com/scl/fi/6nwana14bbfz0atvjtvsn/POSTES_AP_1.xlsx?rlkey=al1b1gh8swvaw2pbiveva5s2z&st=ql7vcwe0&dl=1", btnId: "btnPostesAP" },
+  SP: { nombre: "SP", color: "#0d6efd", clase: "poste-sp", url: "https://dl.dropboxusercontent.com/scl/fi/qgyvee2p6aqlm29uast6a/POSTES-SP_1.xlsx?rlkey=jacosc79uhm3d8up8wkqegknk&st=uloi99vg&dl=1", btnId: "btnPostesSP" },
+  MT: { nombre: "MT", color: "#198754", clase: "poste-mt", url: "https://dl.dropboxusercontent.com/scl/fi/d3j3sylhhpw25k2brorbf/POSTES-MT_1.xlsx?rlkey=fuus129isq3hp3aqn1rexr7zp&st=qilkqyl8&dl=1", btnId: "btnPostesMT" },
+  AT: { nombre: "AT", color: "#dc3545", clase: "poste-at", url: "https://dl.dropboxusercontent.com/scl/fi/ik0qc6cmvo38joj5wc3ji/POSTES-AT_1.xlsx?rlkey=52sjhrheebekg5ay5qhliqcei&st=ta9fkqon&dl=1", btnId: "btnPostesAT" }
+};
+const capasPostes = {}, postesData = {}, postesVisibles = {};
+Object.keys(POSTES_CONFIG).forEach(tipo => {
+  capasPostes[tipo] = L.layerGroup();
+  postesData[tipo] = [];
+  postesVisibles[tipo] = false;
+});
 
 // ============================
 // 🧾 CAPA ATENCIONES ACTIVAS DESDE EXCEL
@@ -760,7 +821,9 @@ document.getElementById("btnComparar").addEventListener("click", () => {
 
 // 🔷 BOTÓN MOSTRAR / OCULTAR SEDs
 function guardarReferenciaSed(lat, lon, etiqueta = "Punto de referencia") {
+  if (!isFinite(lat) || !isFinite(lon)) return;
   ultimaReferenciaSed = { lat: Number(lat), lon: Number(lon), etiqueta };
+  fijarReferenciaPostes(Number(lat), Number(lon), etiqueta);
 }
 
 function obtenerReferenciaSedActual() {
@@ -1583,6 +1646,252 @@ urls.forEach(f => {
     li.textContent = "❌ Error al cargar " + f.nombre;
     progreso.appendChild(li);
   });
+});
+
+function estadoPostesMsg(html, tipo = "") {
+  const el = document.getElementById("estadoPostes");
+  if (!el) return;
+  el.className = "small " + (tipo === "err" ? "text-danger" : tipo === "ok" ? "text-success" : "text-muted");
+  el.innerHTML = html;
+}
+
+function estadoPostesCargando(tipo) {
+  estadoPostesMsg(`Cargando postes ${escapeHtml(tipo)}...<div class="poste-progress"><span></span></div>`);
+}
+
+function normalizarClavePoste(valor) {
+  return String(valor || "")
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase().replace(/[^A-Z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+}
+
+function valorPoste(row, candidatos) {
+  const keys = Object.keys(row || {});
+  for (const cand of candidatos) {
+    const norm = normalizarClavePoste(cand);
+    const exact = keys.find(k => normalizarClavePoste(k) === norm);
+    if (exact) return row[exact];
+  }
+  for (const cand of candidatos) {
+    const norm = normalizarClavePoste(cand);
+    const hit = keys.find(k => normalizarClavePoste(k).includes(norm));
+    if (hit) return row[hit];
+  }
+  return "";
+}
+
+function filaEncabezadoPostes(aoa) {
+  let mejor = 0, mejorScore = -1;
+  (aoa || []).slice(0, 30).forEach((fila, idx) => {
+    const texto = (fila || []).map(normalizarClavePoste).join(" ");
+    let score = 0;
+    if (texto.includes("LONGITUD") || texto.includes("LON") || texto.includes("COORD_X")) score += 3;
+    if (texto.includes("LATITUD") || texto.includes("LAT") || texto.includes("COORD_Y")) score += 3;
+    if (texto.includes("POSTE") || texto.includes("STRUCTURE") || texto.includes("NODE")) score += 1;
+    if (score > mejorScore) {
+      mejorScore = score;
+      mejor = idx;
+    }
+  });
+  return mejor;
+}
+
+function filasPostesDesdeWorksheet(ws) {
+  const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "", blankrows: false, raw: false });
+  const headerIdx = filaEncabezadoPostes(aoa);
+  const headers = (aoa[headerIdx] || []).map((h, i) => String(h || `COL_${i + 1}`).trim() || `COL_${i + 1}`);
+  return aoa.slice(headerIdx + 1).map(fila => {
+    const obj = {};
+    headers.forEach((h, i) => {
+      obj[h] = fila[i] == null ? "" : fila[i];
+    });
+    return obj;
+  });
+}
+
+function numeroPoste(valor) {
+  const txt = String(valor || "").trim();
+  if (!txt) return NaN;
+  return parseFloat(txt.replace(",", "."));
+}
+
+function coordPosteDesdeTexto(valor) {
+  const nums = String(valor || "").match(/-?\d+(?:[.,]\d+)?/g);
+  if (!nums || nums.length < 2) return null;
+  let a = numeroPoste(nums[0]);
+  let b = numeroPoste(nums[1]);
+  if (!isFinite(a) || !isFinite(b)) return null;
+  let lat = a, lon = b;
+  if (Math.abs(a) > 30 && Math.abs(b) <= 30) {
+    lon = a;
+    lat = b;
+  }
+  if (Math.abs(lat) > 90 || Math.abs(lon) > 180) return null;
+  return { lat, lon };
+}
+
+function coordenadasPoste(row) {
+  let lat = numeroPoste(valorPoste(row, ["LATITUD", "LAT", "Y", "COORD_Y", "NORTE"]));
+  let lon = numeroPoste(valorPoste(row, ["LONGITUD", "LON", "LONG", "X", "COORD_X", "ESTE"]));
+  if (isFinite(lat) && isFinite(lon)) {
+    if (Math.abs(lat) > 30 && Math.abs(lon) <= 30) [lat, lon] = [lon, lat];
+    if (Math.abs(lat) <= 90 && Math.abs(lon) <= 180) return { lat, lon };
+  }
+  return coordPosteDesdeTexto(valorPoste(row, ["COORDENADAS", "COORDENADA", "COORD", "UBICACION", "UBICACIÓN", "GPS"]));
+}
+
+function codigoPoste(row, tipo, idx) {
+  const codigo = valorPoste(row, ["CODIGO_POSTE", "COD_POSTE", "CODIGO", "COD", "POSTE", "ID_POSTE", "ID", "NUMERO", "NOMBRE", "STRUCTURE_NODE", "STRUCTURE", "NODE"]);
+  return String(codigo || `${tipo}-${idx + 1}`).trim();
+}
+
+function tooltipPoste(row, tipo, codigo) {
+  const codigoSeguro = escapeHtml(codigo).replace(/'/g, "&#39;");
+  const partes = [
+    `<b>Poste ${escapeHtml(tipo)}:</b> ${escapeHtml(codigo)}`,
+    `<button class="btn btn-sm btn-outline-primary mt-1" onclick="copiarCodigoPoste('${codigoSeguro}')">Copiar codigo</button>`
+  ];
+  Object.entries(row || {}).forEach(([k, v]) => {
+    const val = String(v == null ? "" : v).trim();
+    if (!val) return;
+    const nk = normalizarClavePoste(k);
+    if (["LATITUD", "LAT", "LONGITUD", "LON", "LONG", "X", "Y", "COORD_X", "COORD_Y"].includes(nk)) return;
+    if (nk.includes("LATITUD") || nk.includes("LONGITUD") || nk.includes("COORD")) return;
+    partes.push(`<b>${escapeHtml(k)}:</b> ${escapeHtml(val)}`);
+  });
+  return partes.slice(0, 18).join("<br>");
+}
+
+function codigoCortoPoste(codigo) {
+  const txt = String(codigo || "").trim();
+  const nums = txt.match(/\d+/g);
+  if (nums && nums.length) return nums[nums.length - 1];
+  const partes = txt.split(/[-_\s]+/).filter(Boolean);
+  return partes.length ? partes[partes.length - 1] : txt;
+}
+
+function copiarCodigoPoste(codigo) {
+  const texto = String(codigo || "");
+  if (!texto) return;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(texto).then(() => estadoPostesMsg(`Codigo copiado: <b>${escapeHtml(texto)}</b>`, "ok"));
+  } else {
+    const tmp = document.createElement("textarea");
+    tmp.value = texto;
+    document.body.appendChild(tmp);
+    tmp.select();
+    document.execCommand("copy");
+    tmp.remove();
+    estadoPostesMsg(`Codigo copiado: <b>${escapeHtml(texto)}</b>`, "ok");
+  }
+}
+
+function crearMarcadorPoste(poste) {
+  const icon = L.divIcon({
+    className: "",
+    html: `<div class="poste-wrap ${POSTES_CONFIG[poste.tipo].clase}"></div>`,
+    iconSize: [18, 18],
+    iconAnchor: [9, 9]
+  });
+  const markerPoste = L.marker([poste.lat, poste.lon], { icon, title: poste.codigo });
+  markerPoste.bindPopup(poste.tooltip, { maxWidth: 320, autoPan: true, closeButton: true });
+  return markerPoste;
+}
+
+function fijarReferenciaPostes(lat, lon, etiqueta = "Referencia") {
+  if (!isFinite(lat) || !isFinite(lon)) return;
+  ultimaReferenciaPostes = { lat: Number(lat), lon: Number(lon), etiqueta };
+  if (!Object.keys(postesVisibles).some(t => postesVisibles[t])) return;
+  refrescarPostesCercanos();
+}
+
+function refrescarPostesCercanos() {
+  if (!ultimaReferenciaPostes) return;
+  let total = 0;
+  let mostradosTotal = 0;
+  Object.keys(POSTES_CONFIG).forEach(tipo => {
+    const capa = capasPostes[tipo];
+    capa.clearLayers();
+    if (!postesVisibles[tipo]) return;
+    const cercanos = (postesData[tipo] || [])
+      .map(p => ({ p, d: distancia(ultimaReferenciaPostes.lat, ultimaReferenciaPostes.lon, p.lat, p.lon) }))
+      .filter(x => x.d <= RADIO_VISUAL_POSTES)
+      .sort((a, b) => a.d - b.d);
+    cercanos.slice(0, MAX_POSTES_RENDER).forEach(x => capa.addLayer(crearMarcadorPoste(x.p)));
+    total += cercanos.length;
+    mostradosTotal += Math.min(cercanos.length, MAX_POSTES_RENDER);
+    if (!map.hasLayer(capa)) map.addLayer(capa);
+  });
+  const activos = Object.keys(postesVisibles).filter(t => postesVisibles[t]).join(", ") || "ninguno";
+  const extra = total > mostradosTotal ? ` Mostrando ${mostradosTotal} mas cercanos.` : "";
+  estadoPostesMsg(`Postes cercanos en ${RADIO_VISUAL_POSTES} m: <b>${total}</b> (${activos}).${extra}`, "ok");
+}
+
+async function cargarPostes(tipo) {
+  if (postesData[tipo].length) return postesData[tipo];
+  if (typeof XLSX === "undefined") throw new Error("No cargo la libreria XLSX.");
+  const cfg = POSTES_CONFIG[tipo];
+  estadoPostesCargando(tipo);
+  const resp = await fetch(cfg.url, { cache: "force-cache" });
+  if (!resp.ok) throw new Error(`No se pudo descargar ${tipo}: ${resp.status}`);
+  const buffer = await resp.arrayBuffer();
+  const wb = XLSX.read(buffer, { type: "array", cellDates: true, raw: false });
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const rows = filasPostesDesdeWorksheet(ws);
+  postesData[tipo] = rows.map((row, idx) => {
+    const coord = coordenadasPoste(row);
+    if (!coord) return null;
+    const codigo = codigoPoste(row, tipo, idx);
+    return { tipo, codigo, lat: coord.lat, lon: coord.lon, row, tooltip: tooltipPoste(row, tipo, codigo) };
+  }).filter(Boolean);
+  estadoPostesMsg(`Postes ${tipo}: <b>${postesData[tipo].length}</b> coordenadas cargadas. Busca un suministro, SED o coordenada para ver cercanos.`, "ok");
+  return postesData[tipo];
+}
+
+async function alternarPostes(tipo) {
+  const cfg = POSTES_CONFIG[tipo];
+  const btn = document.getElementById(cfg.btnId);
+  try {
+    if (!postesVisibles[tipo]) {
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = `Cargando postes ${tipo}...`;
+      }
+      await cargarPostes(tipo);
+      postesVisibles[tipo] = true;
+      map.addLayer(capasPostes[tipo]);
+      if (ultimaReferenciaPostes) {
+        refrescarPostesCercanos();
+      } else {
+        capasPostes[tipo].clearLayers();
+        estadoPostesMsg(`Postes ${tipo} activados. Busca un suministro, SED o coordenada.`, "ok");
+      }
+      if (btn) {
+        btn.classList.remove("btn-outline-success", "btn-outline-primary", "btn-outline-danger");
+        btn.classList.add(tipo === "AT" ? "btn-danger" : tipo === "SP" ? "btn-primary" : "btn-success");
+        btn.textContent = `Ocultar postes ${tipo}`;
+      }
+    } else {
+      map.removeLayer(capasPostes[tipo]);
+      postesVisibles[tipo] = false;
+      if (btn) {
+        btn.classList.remove("btn-success", "btn-primary", "btn-danger");
+        btn.classList.add(tipo === "AT" ? "btn-outline-danger" : tipo === "SP" ? "btn-outline-primary" : "btn-outline-success");
+        btn.textContent = `Mostrar postes ${tipo}`;
+      }
+      estadoPostesMsg(`Postes ${tipo} ocultos.`, "ok");
+    }
+  } catch (err) {
+    console.error("Error postes", tipo, err);
+    estadoPostesMsg(`No se pudo cargar postes ${tipo}. Revisa Dropbox/CORS o columnas de coordenadas.`, "err");
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+Object.keys(POSTES_CONFIG).forEach(tipo => {
+  const btn = document.getElementById(POSTES_CONFIG[tipo].btnId);
+  if (btn) btn.addEventListener("click", () => alternarPostes(tipo));
 });
 
 // Cargar SEDs: ahora solo se guardan en memoria.
