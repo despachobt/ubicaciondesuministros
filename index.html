@@ -538,6 +538,7 @@ body.modo-oscuro-mapa .leaflet-control-attribution {
         </div>
         <button id="btnCruzar3ArchivosMapa" class="btn btn-primary btn-sm w-100 mb-2">🔍 Cruzar y pintar mapa</button>
         <button id="btnExportarCruceMapaExcel" class="btn btn-success btn-sm w-100 mb-2" style="display:none;">📊 Descargar Excel cruce</button>
+        <button id="btnExportarInsumosReporteOms" class="btn btn-outline-success btn-sm w-100 mb-2" style="display:none;">📗 Descargar insumos reporte OMS</button>
         <button id="btnExportarActivosJsonRepo" class="btn btn-outline-primary btn-sm w-100 mb-2" style="display:none;">🌐 Descargar data online JSON</button>
         <button id="btnExportarDashboardCruceHtml" class="btn btn-dark btn-sm w-100 mb-2" style="display:none;">Dashboard HTML cruce</button>
         <div id="estadoCruceMapa" class="cruce-mini">Sube los 3 archivos para generar el cruce y pintar los activos.</div>
@@ -679,6 +680,7 @@ const cruceCallsInput = document.getElementById("cruceCallsInput");
 const cruceFsmInput = document.getElementById("cruceFsmInput");
 const btnCruzar3ArchivosMapa = document.getElementById("btnCruzar3ArchivosMapa");
 const btnExportarCruceMapaExcel = document.getElementById("btnExportarCruceMapaExcel");
+const btnExportarInsumosReporteOms = document.getElementById("btnExportarInsumosReporteOms");
 const btnExportarDashboardCruceHtml = document.getElementById("btnExportarDashboardCruceHtml");
 const btnExportarActivosJsonRepo = document.getElementById("btnExportarActivosJsonRepo");
 const estadoCruceMapa = document.getElementById("estadoCruceMapa");
@@ -710,6 +712,9 @@ if (btnCruzar3ArchivosMapa) {
 }
 if (btnExportarCruceMapaExcel) {
   btnExportarCruceMapaExcel.addEventListener("click", exportarCruceMapaExcel);
+}
+if (btnExportarInsumosReporteOms) {
+  btnExportarInsumosReporteOms.addEventListener("click", exportarInsumosReporteOms);
 }
 if (btnExportarDashboardCruceHtml) {
   btnExportarDashboardCruceHtml.addEventListener("click", exportarDashboardCruceHtml);
@@ -2504,6 +2509,7 @@ function refrescarListaAtencionesActivas() {
 const ODM_ACTIVOS_CRUCE = ["ASI", "DES", "INC", "INI", "LLA"]; // REA es ODM cerrada, no activa
 let cruceTicketsRows = [], cruceCallsRows = [], cruceFsmRows = [], cruceResults = [];
 let cruceTicketHeaders = [], cruceCallHeaders = [], cruceFsmHeaders = [];
+let cruceTicketsAoa = [], cruceCallsAoa = [], cruceFsmAoa = [];
 let cruceTicketCols = {}, cruceCallCols = {}, cruceFsmCols = {};
 let cruceTicketFileName = "", cruceCallsFileName = "", cruceFsmFileName = "";
 
@@ -2618,12 +2624,13 @@ function crucePickCallColumns(cols) {
 
 function crucePickFsmColumns(cols) {
   return {
-    orden: crucePickExact(cols, ["Orden"]) || crucePickCol(cols, [["orden"]], { exclude: ["origen", "sistema"] }),
-    origen: crucePickExact(cols, ["Orden sistema origen"]) || crucePickCol(cols, [["orden", "sistema", "origen"], ["sistema", "origen"], ["orden", "origen"], ["ticket", "origen"]]),
-    estado: crucePickExact(cols, ["Status de usuario"]) || crucePickCol(cols, [["status", "usuario"], ["estado", "usuario"], ["status"], ["estado"]]),
-    textoBreve: crucePickExact(cols, ["Texto breve"]) || crucePickCol(cols, [["texto", "breve"], ["descripcion"], ["descrip"], ["denominacion"]]),
+    orden: crucePickExact(cols, ["Orden", "Código de la Orden de Mantenimiento", "Codigo de la Orden de Mantenimiento"]) || crucePickCol(cols, [["orden"]], { exclude: ["origen", "sistema"] }),
+    origen: crucePickExact(cols, ["Orden sistema origen", "Sistema Origen"]) || crucePickCol(cols, [["orden", "sistema", "origen"], ["sistema", "origen"], ["orden", "origen"], ["ticket", "origen"]]),
+    estado: crucePickExact(cols, ["Status de usuario", "Status de sistema", "Estado de actividad técnica", "Estado de actividad tecnica", "Estado de ejecución", "Estado de ejecucion"]) || crucePickCol(cols, [["status", "usuario"], ["status", "sistema"], ["estado", "actividad"], ["estado", "ejecucion"], ["estado", "usuario"], ["status"], ["estado"]]),
+    textoBreve: crucePickExact(cols, ["Texto breve", "Activity Remarks"]) || crucePickCol(cols, [["texto", "breve"], ["activity", "remarks"], ["descripcion"], ["descrip"], ["denominacion"]]),
     responsable: crucePickExact(cols, ["Pto.tbjo.responsable", "Pto. tbjo. responsable"]) || crucePickCol(cols, [["pto", "responsable"], ["responsable"]]),
-    nivel: crucePickExact(cols, ["Nivel Tensión", "Nivel Tension"]) || crucePickCol(cols, [["nivel", "tension"], ["tension"]])
+    nivel: crucePickExact(cols, ["Nivel Tensión", "Nivel Tension"]) || crucePickCol(cols, [["nivel", "tension"], ["tension"]]),
+    objetoTecnico: crucePickExact(cols, ["Denom.ubic.técnica", "Denom.ubic.tecnica", "Ubicación técnica", "Ubicacion tecnica"]) || crucePickCol(cols, [["denom", "ubic", "tecnica"], ["ubicacion", "tecnica"]])
   };
 }
 
@@ -2631,7 +2638,7 @@ function cruceHeaderScore(row, profile) {
   const words = {
     tickets: ["ticket", "estado", "hora de inicio", "longitud", "latitud", "sed", "alimentador", "prioridad"],
     calls: ["ticket", "llamante", "tel llamante", "telefono", "aviso", "suministro", "direccion contacto"],
-    fsm: ["orden", "orden sistema origen", "status de usuario", "texto breve", "pto tbjo responsable", "nivel tension"]
+    fsm: ["orden", "orden sistema origen", "status de usuario", "status de sistema", "texto breve", "pto tbjo responsable", "nivel tension", "denom ubic tecnica"]
   }[profile] || ["ticket", "estado", "orden"];
   return (row || []).reduce((a, c) => a + words.some(w => cruceKeyNorm(c).includes(cruceKeyNorm(w))), 0);
 }
@@ -2658,7 +2665,7 @@ function cruceAoaToObjects(aoa, profile) {
     headers.forEach((h, i) => obj[h] = arr[i] ?? "");
     rows.push(obj);
   }
-  return { headers, rows };
+  return { headers, rows, headerRow: best };
 }
 
 async function cruceReadFile(file, profile) {
@@ -2668,7 +2675,7 @@ async function cruceReadFile(file, profile) {
   const ws = wb.Sheets[sheetName];
   const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "", blankrows: false, raw: false });
   const parsed = cruceAoaToObjects(aoa, profile);
-  return { sheetName, headers: parsed.headers, rows: parsed.rows };
+  return { sheetName, headers: parsed.headers, rows: parsed.rows, aoa, headerRow: parsed.headerRow };
 }
 
 function cruceFsmTokens(valor) {
@@ -2678,6 +2685,24 @@ function cruceFsmTokens(valor) {
 function cruceFsmIsActive(valor) {
   const toks = cruceFsmTokens(valor);
   return toks.some(t => ODM_ACTIVOS_CRUCE.includes(t));
+}
+
+function cruceExtraerTicketsDesdeTexto(valor) {
+  const txt = String(valor || "");
+  const encontrados = new Set();
+  const patrones = [
+    /\bBT\s*[:#-]?\s*(\d{7,12})/gi,
+    /\b(?:TICKET|GESI|CASO)\s*[:#-]?\s*(\d{7,12})/gi,
+    /\b(26\d{7,10})\b/g
+  ];
+  patrones.forEach(re => {
+    let m;
+    while ((m = re.exec(txt)) !== null) {
+      const code = cruceCleanCode(m[1]);
+      if (code) encontrados.add(code);
+    }
+  });
+  return Array.from(encontrados);
 }
 
 function cruceOrderRank(valor) {
@@ -2820,6 +2845,56 @@ function construirResumenContratistaCruce() {
   ];
 }
 
+function construirReporteTdOmsCruce() {
+  const filas = cruceResults || [];
+  const resumenTipo = sumarMatrizResumen(
+    filas,
+    r => r.tipoResumen || "SIN CLASIFICAR",
+    r => r.contratistaSet || r.contratista,
+    ["SUMINISTRO", "FALLA EN RED", "CONEXIONES", "SIN CLASIFICAR"]
+  );
+  const resumenRango = sumarMatrizResumen(
+    filas,
+    r => {
+      const inicioMs = cruceParseDateMs(r.horaInicio);
+      return cruceDashboardRangoHoras(inicioMs ? ((Date.now() - inicioMs) / 3600000) : null).label;
+    },
+    r => r.contratistaSet || r.contratista,
+    ["0 a 4", "4 a 8", "8 a 12", "12 a 16", "16 a 24", "24 a mas", "Sin fecha"]
+  );
+  const resumenOdm = sumarMatrizResumen(
+    filas,
+    r => r.hasActiveOdm ? "CON ODM ACTIVA" : (r.hasFsm ? "ODM NO ACTIVA / CERRADA" : "SIN REGISTRO FSM"),
+    r => r.contratistaSet || r.contratista,
+    ["CON ODM ACTIVA", "ODM NO ACTIVA / CERRADA", "SIN REGISTRO FSM"]
+  );
+  const resumenFecha = sumarMatrizResumen(
+    filas,
+    r => cruceFechaDiaEtiqueta(r.horaInicio),
+    r => r.contratistaSet || r.contratista,
+    []
+  );
+  return [
+    ["REPORTE PENDIENTES OMS BT"],
+    ["Generado", new Date().toLocaleString("es-PE")],
+    ["Archivo tickets", cruceTicketFileName || ""],
+    ["Archivo llamadas", cruceCallsFileName || ""],
+    ["Archivo FSM", cruceFsmFileName || ""],
+    [],
+    ["Resumen por tipo de evento y contratista"],
+    ...resumenTipo,
+    [],
+    ["Resumen por rango de horas y contratista"],
+    ...resumenRango,
+    [],
+    ["Resumen por asignacion ODM y contratista"],
+    ...resumenOdm,
+    [],
+    ["Resumen por fecha de inicio y contratista"],
+    ...resumenFecha
+  ];
+}
+
 function cruceBuildCallsIndex() {
   const idx = {};
   cruceCallsRows.forEach((row, i) => {
@@ -2838,13 +2913,18 @@ function cruceBuildFsmIndex() {
   const idx = {};
   cruceFsmRows.forEach((row, i) => {
     const origen = cruceCleanCode(cruceFsmCols.origen ? row[cruceFsmCols.origen] : "");
-    if (!origen) return;
     const orden = cruceCleanCode(cruceFsmCols.orden ? row[cruceFsmCols.orden] : "");
     const estado = String(cruceFsmCols.estado ? row[cruceFsmCols.estado] : "").trim();
     const textoBreve = String(cruceFsmCols.textoBreve ? row[cruceFsmCols.textoBreve] : "").trim();
+    const ticketsTexto = cruceExtraerTicketsDesdeTexto(textoBreve);
+    const ticketsOrigen = cruceExtraerTicketsDesdeTexto(origen);
+    const tickets = Array.from(new Set([origen, ...ticketsOrigen, ...ticketsTexto].map(cruceCleanCode).filter(Boolean)));
+    if (!tickets.length) return;
     const item = { row, rowIndex: i, origen, orden, estado, textoBreve, active: cruceFsmIsActive(estado), rank: cruceOrderRank(orden) };
-    if (!idx[origen]) idx[origen] = [];
-    idx[origen].push(item);
+    tickets.forEach(ticket => {
+      if (!idx[ticket]) idx[ticket] = [];
+      idx[ticket].push(item);
+    });
   });
   Object.values(idx).forEach(arr => arr.sort((a, b) => (b.rank - a.rank) || (b.rowIndex - a.rowIndex)));
   return idx;
@@ -2895,12 +2975,15 @@ async function leerArchivosCruceSiNecesario() {
   cruceTicketHeaders = tickets.headers; cruceTicketsRows = tickets.rows; cruceTicketCols = crucePickTicketColumns(cruceTicketHeaders);
   cruceCallHeaders = calls.headers; cruceCallsRows = calls.rows; cruceCallCols = crucePickCallColumns(cruceCallHeaders);
   cruceFsmHeaders = fsm.headers; cruceFsmRows = fsm.rows; cruceFsmCols = crucePickFsmColumns(cruceFsmHeaders);
+  cruceTicketsAoa = tickets.aoa || [];
+  cruceCallsAoa = calls.aoa || [];
+  cruceFsmAoa = fsm.aoa || [];
 
   const faltan = [];
   if (!cruceTicketCols.ticket) faltan.push("Ticket en tickets");
   if (!cruceTicketCols.estado) faltan.push("Estado en tickets");
   if (!cruceCallCols.ticket) faltan.push("Ticket en llamadas");
-  if (!cruceFsmCols.origen) faltan.push("Orden sistema origen en FSM");
+  if (!cruceFsmCols.origen && !cruceFsmCols.textoBreve) faltan.push("Orden sistema origen o ticket BT en Texto breve en FSM");
   if (!cruceFsmCols.orden) faltan.push("Orden en FSM");
   if (!cruceFsmCols.estado) faltan.push("Status de usuario en FSM");
   if (faltan.length) throw new Error("Columnas no detectadas: " + faltan.join(", "));
@@ -2930,7 +3013,9 @@ function ejecutarCruce3Archivos() {
     const fsmDetail = fsmMatches.map(x => (x.orden || "-") + " (" + (x.estado || "-") + ")" + (x.textoBreve ? " - " + x.textoBreve : "")).join("\n");
     const horaInicio = cruceV(t, cruceTicketCols.horaInicio);
     const setTicket = cruceV(t, cruceTicketCols.set);
-    const objetoTecnico = cruceV(t, cruceTicketCols.objetoTecnico);
+    const objetoTecnicoTicket = cruceV(t, cruceTicketCols.objetoTecnico);
+    const objetoTecnicoFsm = fsmItem ? cruceV(fsmItem.row, cruceFsmCols.objetoTecnico) : "";
+    const objetoTecnico = objetoTecnicoTicket || objetoTecnicoFsm;
     const ptoResponsable = fsmItem ? cruceV(fsmItem.row, cruceFsmCols.responsable) : "";
     const contratistaTicket = cruceV(t, cruceTicketCols.contratista);
     const contratistaSet = resolverContratistaPorSet(setTicket, cruceV(t, cruceTicketCols.alimentador), ptoResponsable, contratistaTicket);
@@ -3099,6 +3184,7 @@ async function cruzar3ArchivosYPintarMapa() {
     estadoCruce(`✅ Cruce listo: ${resultados.length} tickets evaluados · ${conCoord} pintados · ${observados} observados`, "ok");
 
     if (btnExportarCruceMapaExcel) btnExportarCruceMapaExcel.style.display = "block";
+    if (btnExportarInsumosReporteOms) btnExportarInsumosReporteOms.style.display = "block";
     if (btnExportarDashboardCruceHtml) btnExportarDashboardCruceHtml.style.display = "block";
     if (btnExportarActivosJsonRepo) btnExportarActivosJsonRepo.style.display = "block";
   } catch (err) {
@@ -3157,7 +3243,126 @@ function exportarCruceMapaExcel() {
   const wsResumen = XLSX.utils.aoa_to_sheet(resumen);
   wsResumen["!cols"] = [{ wch: 22 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 14 }, { wch: 12 }, { wch: 14 }];
   XLSX.utils.book_append_sheet(wb, wsResumen, "RESUMEN");
+  const tdOms = construirReporteTdOmsCruce();
+  const wsTdOms = XLSX.utils.aoa_to_sheet(tdOms);
+  wsTdOms["!cols"] = [{ wch: 32 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 16 }, { wch: 16 }];
+  wsTdOms["!merges"] = [
+    { s: { r: 0, c: 0 }, e: { r: 0, c: 6 } }
+  ];
+  XLSX.utils.book_append_sheet(wb, wsTdOms, "TD OMS");
   XLSX.writeFile(wb, "Cruce_3_Excel_Tickets_Llamadas_FSM.xlsx");
+}
+
+function normalizarAoaParaExcel(aoa) {
+  return (aoa || [])
+    .filter(row => (row || []).some(v => String(v == null ? "" : v).trim()))
+    .map(row => (row || []).map(v => v == null ? "" : v));
+}
+
+function aoaDesdeObjetos(headers, rows) {
+  const salida = [headers || []];
+  (rows || []).forEach(row => salida.push((headers || []).map(h => row[h] ?? "")));
+  return salida;
+}
+
+function agregarHojaInsumo(wb, nombre, aoa, headersFallback, rowsFallback) {
+  const data = normalizarAoaParaExcel(aoa);
+  const finalData = data.length ? data : aoaDesdeObjetos(headersFallback, rowsFallback);
+  const ws = XLSX.utils.aoa_to_sheet(finalData);
+  const header = finalData[0] || [];
+  ws["!cols"] = header.map((h, i) => {
+    const muestras = finalData.slice(0, 60).map(r => String((r || [])[i] ?? "").length);
+    return { wch: Math.min(Math.max(String(h || "").length + 2, ...muestras, 10), 36) };
+  });
+  XLSX.utils.book_append_sheet(wb, ws, nombre);
+}
+
+function cruceValorTicketInsumo(row, exactos = [], grupos = [], opts = {}) {
+  const col = crucePickExact(cruceTicketHeaders, exactos) || crucePickCol(cruceTicketHeaders, grupos, opts);
+  return col ? (row[col] ?? "") : "";
+}
+
+function construirAsignacionOmsInsumo() {
+  const headers = [
+    "Prioridad",
+    "Ticket",
+    "Tipo de Equipo probable de falla",
+    "Hora de inicio",
+    "Tensión",
+    "Zona",
+    "SET",
+    "Alimentador",
+    "SED",
+    "Afectación",
+    "Llamadas",
+    "Estado",
+    "Alimentador BT",
+    "Objeto Técnico",
+    "Distrito",
+    "Tiempo estimado de reposición (ETR)",
+    "Origen de interrupción",
+    "Longitud",
+    "Latitud"
+  ];
+
+  const rows = cruceTicketsRows
+    .filter(row => !cruceIsRestoredState(cruceValorTicketInsumo(row, ["Estado"], [["estado", "ticket"], ["estado", "averia"], ["estado"]])))
+    .map(row => [
+      cruceValorTicketInsumo(row, ["Prioridad"], [["prioridad"]]),
+      cruceValorTicketInsumo(row, ["Ticket"], [["ticket"], ["gesi"], ["caso"]]),
+      cruceValorTicketInsumo(row, ["Tipo de Equipo probable de falla", "Tipo Equipo probable de falla", "Tipo de equipo probable"], [["tipo", "equipo", "probable"], ["equipo", "probable"]]),
+      cruceValorTicketInsumo(row, ["Hora de inicio", "Fecha inicio", "FECHA INICIO"], [["hora", "inicio"], ["fecha", "inicio"], ["createddate"]]),
+      cruceValorTicketInsumo(row, ["Tensión", "Tension"], [["tension"]]),
+      cruceValorTicketInsumo(row, ["Zona"], [["zona"]]),
+      cruceValorTicketInsumo(row, ["SET", "SE", "Subestación", "Subestacion"], [["subestacion"], ["set"]], { exclude: ["sed"] }),
+      cruceValorTicketInsumo(row, ["Alimentador"], [["alimentador"], ["linea"]]),
+      cruceValorTicketInsumo(row, ["SED"], [["sed"]]),
+      cruceValorTicketInsumo(row, ["Afectación", "Afectacion"], [["afectacion"]]),
+      cruceValorTicketInsumo(row, ["Llamadas"], [["llamadas"]]),
+      cruceValorTicketInsumo(row, ["Estado"], [["estado", "ticket"], ["estado", "averia"], ["estado"]]),
+      cruceValorTicketInsumo(row, ["Alimentador BT"], [["alimentador", "bt"]]),
+      cruceValorTicketInsumo(row, ["Objeto Técnico", "Objeto tecnico", "OBJETO_TECNICO"], [["objeto", "tecnico"]]),
+      cruceValorTicketInsumo(row, ["Distrito"], [["distrito"]]),
+      cruceValorTicketInsumo(row, ["Tiempo estimado de reposición (ETR)", "Tiempo estimado de reposicion (ETR)", "ETR"], [["tiempo", "estimado", "reposicion"], ["etr"]]),
+      cruceValorTicketInsumo(row, ["Origen de interrupción", "Origen de interrupcion"], [["origen", "interrupcion"]]),
+      cruceValorTicketInsumo(row, ["Longitud"], [["longitud"], ["lon"]]),
+      cruceValorTicketInsumo(row, ["Latitud"], [["latitud"], ["lat"]])
+    ]);
+
+  return [headers, ...rows];
+}
+
+function exportarInsumosReporteOms() {
+  if (!cruceTicketsRows.length || !cruceCallsRows.length || !cruceFsmRows.length) {
+    alert("Primero selecciona los 3 archivos y genera el cruce.");
+    return;
+  }
+
+  const wb = XLSX.utils.book_new();
+  const leeme = [
+    ["Insumos para Reporte Pendientes OMS BT"],
+    ["Generado", new Date().toLocaleString("es-PE")],
+    [],
+    ["Hoja", "Contenido", "Archivo origen"],
+    ["Asignación OMS", "Interrupciones / tickets activos sin restaurados y solo columnas del reporte", cruceTicketFileName || ""],
+    ["Dirección", "Fallo del cliente / llamadas", cruceCallsFileName || ""],
+    ["BASE SAP", "Export FSM / SAP", cruceFsmFileName || ""],
+    [],
+    ["Uso sugerido"],
+    ["1. Abre tu reporte plantilla."],
+    ["2. Reemplaza el contenido de estas hojas por las hojas de este archivo."],
+    ["3. En Excel usa Datos > Actualizar todo para refrescar tablas dinámicas y gráficas."]
+  ];
+  const wsLeeme = XLSX.utils.aoa_to_sheet(leeme);
+  wsLeeme["!cols"] = [{ wch: 26 }, { wch: 48 }, { wch: 44 }];
+  XLSX.utils.book_append_sheet(wb, wsLeeme, "LEEME");
+
+  agregarHojaInsumo(wb, "Asignación OMS", construirAsignacionOmsInsumo(), [], []);
+  agregarHojaInsumo(wb, "Dirección", cruceCallsAoa, cruceCallHeaders, cruceCallsRows);
+  agregarHojaInsumo(wb, "BASE SAP", cruceFsmAoa, cruceFsmHeaders, cruceFsmRows);
+
+  XLSX.writeFile(wb, "Insumos_Reporte_OMS_BT.xlsx");
+  estadoCruce("Insumos del reporte OMS descargados. Reemplaza hojas en tu plantilla y actualiza todo.", "ok");
 }
 
 function cruceDashboardFechaIso(ms) {
