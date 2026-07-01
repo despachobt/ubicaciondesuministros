@@ -3014,6 +3014,26 @@ function ejecutarCruce3Archivos() {
     const horaLlamada = callRow ? (cruceV(callRow, cruceCallCols.horaRegistro) || cruceV(callRow, cruceCallCols.horaAveria)) : "";
     const llamadasTicket = cruceV(t, cruceTicketCols.llamadas);
     const descFalla = callRow ? cruceV(callRow, cruceCallCols.descFalla) : "";
+    const llamadasDetalle = callMatches.map((cm, idx) => {
+      const c = cm.row;
+      const tel = cruceCleanPhone(cruceV(c, cruceCallCols.telLlamante)) || cruceCleanPhone(cruceV(c, cruceCallCols.telefono));
+      return {
+        nro: idx + 1,
+        llamante: cruceV(c, cruceCallCols.llamante),
+        telefono: tel,
+        telLlamante: cruceV(c, cruceCallCols.telLlamante),
+        telefonoCliente: cruceV(c, cruceCallCols.telefono),
+        aviso: cruceV(c, cruceCallCols.aviso),
+        suministro: cruceV(c, cruceCallCols.suministro),
+        horaLlamada: cruceV(c, cruceCallCols.horaRegistro) || cruceV(c, cruceCallCols.horaAveria),
+        descFalla: cruceV(c, cruceCallCols.descFalla),
+        direccion: cruceV(c, cruceCallCols.direccionContacto) || cruceV(c, cruceCallCols.direccion),
+        distrito: cruceV(c, cruceCallCols.distrito),
+        latitud: cruceV(c, cruceCallCols.latitud),
+        longitud: cruceV(c, cruceCallCols.longitud),
+        coordenadas: cruceV(c, cruceCallCols.ubicacion)
+      };
+    });
     const fsmDetail = fsmMatches.map(x => (x.orden || "-") + " (" + (x.estado || "-") + ")" + (x.textoBreve ? " - " + x.textoBreve : "")).join("\n");
     const horaInicio = cruceV(t, cruceTicketCols.horaInicio);
     const setTicket = cruceV(t, cruceTicketCols.set);
@@ -3047,6 +3067,7 @@ function ejecutarCruce3Archivos() {
       suministro: callRow ? cruceV(callRow, cruceCallCols.suministro) : "",
       llamadas: llamadasTicket,
       descFalla,
+      llamadasDetalle,
       horaLlamada,
       direccionContacto: callRow ? (cruceV(callRow, cruceCallCols.direccionContacto) || cruceV(callRow, cruceCallCols.direccion)) : "",
       distritoLlamada: callRow ? cruceV(callRow, cruceCallCols.distrito) : "",
@@ -3103,6 +3124,7 @@ function resultadoCruceAItemMapa(r, idx) {
   item.horaLlamada = r.horaLlamada;
   item.llamadas = r.llamadas;
   item.descFalla = r.descFalla;
+  item.llamadasDetalle = r.llamadasDetalle || [];
   item.textoBreveOdm = r.textoBreveFsm || item.textoBreveOdm || "";
   item.contratistaSet = r.contratistaSet || item.contratistaSet || item.contratista;
   item.contratista = item.contratistaSet || item.contratista;
@@ -3231,6 +3253,41 @@ function cruceRowsParaExportar() {
   return data;
 }
 
+function cruceLlamadasActivasRows(resultados = cruceResults) {
+  const rows = [];
+  (resultados || []).forEach(r => {
+    const llamadas = Array.isArray(r.llamadasDetalle) ? r.llamadasDetalle : [];
+    llamadas.forEach(ll => {
+      rows.push({
+        Ticket: r.ticket || "",
+        "Nro llamada": ll.nro || "",
+        "Hora inicio ticket": r.horaInicio || "",
+        "Estado ticket": r.estadoTicket || "",
+        Prioridad: r.prioridad || "",
+        Contratista: r.contratistaSet || r.contratista || "",
+        "Tipo evento": r.tipoResumen || "",
+        Llamadas: r.llamadas || llamadas.length || "",
+        "Desc. falla": ll.descFalla || r.descFalla || "",
+        Llamante: ll.llamante || "",
+        Telefono: ll.telefono || "",
+        "Tel. llamante": ll.telLlamante || "",
+        "Telefono cliente": ll.telefonoCliente || "",
+        Aviso: ll.aviso || "",
+        Suministro: ll.suministro || "",
+        "Hora llamada": ll.horaLlamada || "",
+        Distrito: ll.distrito || r.distritoLlamada || r.distrito || "",
+        Direccion: ll.direccion || r.direccionContacto || r.direccionTicket || "",
+        SED: r.sed || "",
+        Alimentador: r.alimentador || "",
+        Coordenadas: ll.coordenadas || r.coordenadas || "",
+        Latitud: ll.latitud || r.latitudBase || "",
+        Longitud: ll.longitud || r.longitudBase || ""
+      });
+    });
+  });
+  return rows;
+}
+
 function exportarCruceMapaExcel() {
   if (!cruceResults.length) {
     alert("Primero genera el cruce 3 archivos.");
@@ -3241,6 +3298,10 @@ function exportarCruceMapaExcel() {
   const ws = XLSX.utils.aoa_to_sheet(data);
   ws["!cols"] = data[0].map(h => ({ wch: Math.min(Math.max(String(h).length + 2, 12), 34) }));
   XLSX.utils.book_append_sheet(wb, ws, "CRUCE_3_EXCEL");
+  const llamadasActivas = cruceLlamadasActivasRows();
+  const wsLlamadas = XLSX.utils.json_to_sheet(llamadasActivas.length ? llamadasActivas : [{ Mensaje: "No hay llamadas asociadas a tickets activos." }]);
+  wsLlamadas["!cols"] = Object.keys(llamadasActivas[0] || { Mensaje: "" }).map(k => ({ wch: Math.min(Math.max(k.length + 4, 12), 46) }));
+  XLSX.utils.book_append_sheet(wb, wsLlamadas, "LLAMADAS_ACTIVAS");
   const resumen = construirResumenContratistaCruce();
   resumen.push([], ["Métrica", "Valor"],
     ["Archivo tickets", cruceTicketFileName], ["Archivo llamadas", cruceCallsFileName], ["Archivo FSM", cruceFsmFileName],
@@ -3452,6 +3513,7 @@ function cruceDashboardRows() {
       horaLlamada: r.horaLlamada || "",
       llamadas: r.llamadas || "",
       descFalla: r.descFalla || "",
+      llamadasDetalle: r.llamadasDetalle || [],
       llamante: r.llamante || "",
       numeroCelular: r.numeroCelular || "",
       telLlamante: r.telLlamante || "",
@@ -3657,7 +3719,8 @@ function limpiarFiltros(){document.querySelectorAll(".filters input,.filters sel
 function exportarVistaExcel(){
  if(!vista.length){alert("No hay datos para exportar.");return;}
  const rows=vista.map(function(x){return {"Ticket":x.ticket,"Tipo evento":x.tipoEvento||x.tipoResumen,"Rango horas":x.rango,"Horas atencion":x.horas,"Hora inicio":x.horaInicio,"Contratista":x.contratista,"Estado ticket":x.estadoTicket,"Llamadas":x.llamadas,"Desc. falla":x.descFalla,"Asignado ODM":x.asignadoOdm,"Primer llamante":x.llamante,"Numero celular":x.numeroCelular,"Tel. llamante":x.telLlamante,"Telefono cliente":x.telefonoCliente,"Aviso":x.aviso,"Suministro":x.suministro,"Hora llamada":x.horaLlamada,"Coordenadas":x.coordenadas,"Latitud":x.latitud,"Longitud":x.longitud,"Link Google Maps":x.mapsUrl,"ODM":x.odm,"Estado ODM":x.estadoOdm,"Cruce ODM":x.cruceOdm,"ODM activa":x.odmActiva,"Total ODMs FSM":x.totalOdmsFsm,"Detalle ODMs FSM":x.detalleOdmsFsm,"SED":x.sed,"Alimentador":x.alimentador,"Distrito":x.distrito,"Direccion":x.direccion,"Prioridad":x.prioridad};});
- const wb=XLSX.utils.book_new(); const ws=XLSX.utils.json_to_sheet(rows); ws["!cols"]=Object.keys(rows[0]).map(function(k){return {wch:Math.min(Math.max(k.length+4,12),42)};}); XLSX.utils.book_append_sheet(wb,ws,"VISTA_FILTRADA"); XLSX.writeFile(wb,"Dashboard_Tickets_Activos_Filtrado.xlsx");
+ const llamadasRows=[]; vista.forEach(function(x){const llamadas=Array.isArray(x.llamadasDetalle)?x.llamadasDetalle:[]; llamadas.forEach(function(ll,i){llamadasRows.push({"Ticket":x.ticket,"Nro llamada":ll.nro||i+1,"Hora inicio ticket":x.horaInicio,"Estado ticket":x.estadoTicket,"Prioridad":x.prioridad,"Contratista":x.contratista,"Tipo evento":x.tipoEvento||x.tipoResumen,"Llamadas":x.llamadas||llamadas.length,"Desc. falla":ll.descFalla||x.descFalla,"Llamante":ll.llamante||"","Telefono":ll.telefono||"","Tel. llamante":ll.telLlamante||"","Telefono cliente":ll.telefonoCliente||"","Aviso":ll.aviso||"","Suministro":ll.suministro||"","Hora llamada":ll.horaLlamada||"","Distrito":ll.distrito||x.distrito,"Direccion":ll.direccion||x.direccion,"SED":x.sed,"Alimentador":x.alimentador,"Coordenadas":ll.coordenadas||x.coordenadas,"Latitud":ll.latitud||x.latitud,"Longitud":ll.longitud||x.longitud,"Link Google Maps":x.mapsUrl});});});
+ const wb=XLSX.utils.book_new(); const ws=XLSX.utils.json_to_sheet(rows); ws["!cols"]=Object.keys(rows[0]).map(function(k){return {wch:Math.min(Math.max(k.length+4,12),42)};}); XLSX.utils.book_append_sheet(wb,ws,"VISTA_FILTRADA"); const llamadasFinal=llamadasRows.length?llamadasRows:[{"Mensaje":"No hay llamadas asociadas a los tickets activos filtrados."}]; const wsLlamadas=XLSX.utils.json_to_sheet(llamadasFinal); wsLlamadas["!cols"]=Object.keys(llamadasFinal[0]).map(function(k){return {wch:Math.min(Math.max(k.length+4,12),46)};}); XLSX.utils.book_append_sheet(wb,wsLlamadas,"LLAMADAS_ACTIVAS"); XLSX.writeFile(wb,"Dashboard_Tickets_Activos_Filtrado.xlsx");
 }
 init();
 <\/script>
@@ -3696,6 +3759,7 @@ function activosParaJsonRepositorio() {
       horaInicio: x.horaInicio || "", fechaInicioMs: x.fechaInicioMs || null,
       llamante: x.llamante || "", numeroCelular: x.numeroCelular || "", aviso: x.aviso || "", horaLlamada: x.horaLlamada || "",
       llamadas: x.llamadas || "", descFalla: x.descFalla || "",
+      llamadasDetalle: x.llamadasDetalle || [],
       ptoResponsable: x.ptoResponsable || "", nivelTensionFsm: x.nivelTensionFsm || ""
     }))
   };
