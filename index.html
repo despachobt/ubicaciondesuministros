@@ -2110,7 +2110,7 @@ function esOdmActivaExcel(odmActiva, estadoOdm) {
 
   // REA es ODM cerrada: debe ganar incluso si un archivo antiguo trae ODM_ACTIVA = SI.
   if (e === "REA" || e.includes("REA ") || e.includes("CERR") || e.includes("CAN") || e.includes("ANU") || e.includes("ANUL")) return false;
-  if (["ASI", "DES", "INC", "INI", "LLA"].includes(e)) return true;
+  if (["ASI", "DES", "INC", "INI", "LLA", "TOC"].includes(e)) return true;
   if (["NO", "FALSE", "FALSO", "0", "INACTIVA", "INACTIVO"].includes(v)) return false;
   if (["SI", "S", "TRUE", "VERDADERO", "1", "ACTIVA", "ACTIVO"].includes(v)) return true;
 
@@ -2506,7 +2506,7 @@ function refrescarListaAtencionesActivas() {
 // ============================
 // 🔗 CRUCE 3 ARCHIVOS INTEGRADO PARA GENERAR ACTIVOS DEL MAPA
 // ============================
-const ODM_ACTIVOS_CRUCE = ["ASI", "DES", "INC", "INI", "LLA"]; // REA es ODM cerrada, no activa
+const ODM_ACTIVOS_CRUCE = ["ASI", "DES", "INC", "INI", "LLA", "TOC"]; // REA es ODM cerrada, no activa
 let cruceTicketsRows = [], cruceCallsRows = [], cruceFsmRows = [], cruceResults = [];
 let cruceTicketHeaders = [], cruceCallHeaders = [], cruceFsmHeaders = [];
 let cruceTicketsAoa = [], cruceCallsAoa = [], cruceFsmAoa = [];
@@ -3546,7 +3546,7 @@ function construirDashboardCruceHtml() {
 <style>
 :root{--bg:#f4f6f8;--card:#fff;--txt:#172033;--mut:#667085;--line:#d7dde5;--blue:#0d6efd;--green:#168a4a;--red:#d92d20}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--txt);font-family:Arial,Helvetica,sans-serif;font-size:14px}
-header{padding:18px 22px;background:#101828;color:white}h1{font-size:22px;margin:0 0 4px}header p{margin:0;color:#cbd5e1}
+header{padding:18px 22px;background:#101828;color:white}h1{font-size:22px;margin:0 0 8px}header p{margin:6px 0 0;color:#cbd5e1}.corteBox{display:inline-flex;align-items:center;gap:8px;background:#facc15;color:#111827;border-radius:8px;padding:8px 12px;font-size:18px;font-weight:900;box-shadow:0 2px 8px rgba(0,0,0,.18)}
 .wrap{padding:16px 20px}.kpis{display:grid;grid-template-columns:repeat(4,minmax(140px,1fr));gap:10px;margin-bottom:12px}
 .kpi,.card{background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:0 1px 2px rgba(16,24,40,.06)}
 .kpi{padding:12px}.kpi b{display:block;font-size:24px}.kpi span{color:var(--mut);font-size:12px}
@@ -3560,7 +3560,7 @@ header{padding:18px 22px;background:#101828;color:white}h1{font-size:22px;margin
 </style>
 </head>
 <body>
-<header><h1>Dashboard tickets activos</h1><p>Cruce Tickets activos + Fallo cliente + Export FSM · Generado ${generado}</p></header>
+<header><h1>Dashboard tickets activos</h1><div class="corteBox">Corte generado: ${generado}</div><p>Cruce Tickets activos + Fallo cliente + Export FSM</p></header>
 <main class="wrap">
   <section class="kpis">
     <div class="kpi"><b id="kTotal">0</b><span>Tickets filtrados</span></div>
@@ -3611,13 +3611,17 @@ function aplicarCambiosLocales(){try{const raw=localStorage.getItem(DASHBOARD_ST
 function recalcOdmManual(x){if((x.odm||"").trim()){if(!x.estadoOdm)x.estadoOdm="MANUAL";x.cruceOdm=x.manualEditado==="SI"?"ODM MANUAL":"CON ODM";x.odmActiva="SI";x.asignadoOdm="SI";}else{x.estadoOdm="";x.cruceOdm="SIN REGISTRO FSM";x.odmActiva="NO";x.asignadoOdm="NO";}}
 const TIPOS_EVENTO_EDITABLES=["SUMINISTRO","CONEXIONES","FALLA EN RED"];
 const CONTRATISTAS_EDITABLES=["INMEL","DOMINION","COBRA","PA","LARI","SIN ASIGNAR"];
+const ESTADOS_TICKET_EDITABLES=["Escalado Activo","Escalado Asignado","Asignado","Activo","Pendiente","CERRADO"];
 function opcionesTipoEvento(valor){return TIPOS_EVENTO_EDITABLES.map(function(t){return "<option value='"+t+"'"+((valor||"")===t?" selected":"")+">"+t+"</option>";}).join("");}
 function opcionesContratista(valor){return CONTRATISTAS_EDITABLES.map(function(t){return "<option value='"+t+"'"+((valor||"")===t?" selected":"")+">"+t+"</option>";}).join("");}
+function opcionesEstadoTicket(valor){const actual=String(valor||"").trim();const vals=ESTADOS_TICKET_EDITABLES.slice();if(actual && !vals.includes(actual))vals.unshift(actual);return vals.map(function(t){return "<option value='"+esc(t)+"'"+(actual===t?" selected":"")+">"+esc(t)+"</option>";}).join("");}
+function estadoTicketCerrado(x){const e=String(x.estadoTicket||"").toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");return e.includes("CERRADO")||e.includes("FINALIZADO")||e.includes("RESTAURADO")||e.includes("ANULADO")||e.includes("CANCELADO");}
 function reconstruirFiltros(){const vals={fContratista:document.getElementById("fContratista").value,fTipoEvento:document.getElementById("fTipoEvento").value,fRango:document.getElementById("fRango").value,fOdm:document.getElementById("fOdm").value};document.getElementById("fContratista").innerHTML='<option value="">Todas las contratistas</option>';document.getElementById("fTipoEvento").innerHTML='<option value="">Todos los tipos de evento</option>';document.getElementById("fRango").innerHTML='<option value="">Todos los rangos</option>';document.getElementById("fOdm").innerHTML='<option value="">Todos los estados ODM</option>';fillSelect("fContratista",CONTRATISTAS_EDITABLES);fillSelect("fTipoEvento",TIPOS_EVENTO_EDITABLES);fillSelect("fRango",RANGOS.map(function(x){return x.label;}));fillSelect("fOdm",uniq(DATA.map(function(x){return x.cruceOdm;})));Object.keys(vals).forEach(function(id){document.getElementById(id).value=vals[id]||"";});}
 function init(){normalizarEdicionInicial();aplicarCambiosLocales();reconstruirFiltros();document.querySelectorAll(".filters input,.filters select").forEach(function(el){el.addEventListener("input",render);el.addEventListener("change",render);}); render();}
 function filtrados(){
  const q=document.getElementById("fBuscar").value.trim().toLowerCase(), c=document.getElementById("fContratista").value, te=document.getElementById("fTipoEvento").value, r=document.getElementById("fRango").value, o=document.getElementById("fOdm").value, d=document.getElementById("fDesde").value, h=document.getElementById("fHasta").value;
  return DATA.filter(function(x){
+  if(estadoTicketCerrado(x)) return false;
   if(c && x.contratista!==c) return false; if(te && (x.tipoEvento||x.tipoResumen)!==te) return false; if(r && x.rango!==r) return false; if(o && x.cruceOdm!==o) return false; if(d && (!x.fechaInicio || x.fechaInicio<d)) return false; if(h && (!x.fechaInicio || x.fechaInicio>h)) return false;
   if(q){const blob=[x.ticket,x.odm,x.estadoOdm,x.detalleOdmsFsm,x.contratista,x.tipoEvento,x.tipoResumen,x.prioridad,x.sed,x.alimentador,x.distrito,x.direccion,x.suministro,x.aviso,x.llamadas,x.descFalla,x.llamante,x.numeroCelular,x.telLlamante,x.telefonoCliente,x.coordenadas].join(" ").toLowerCase(); if(!blob.includes(q)) return false;}
   return true;
@@ -3690,15 +3694,16 @@ function renderTabla(){
   const manual=x.manualEditado==="SI"?" manual":"";
   const tipoInput="<select class='editbox"+manual+"' onchange='actualizarFilaManual("+x.__idx+",\\\"tipoEvento\\\",this.value)'>"+opcionesTipoEvento(x.tipoEvento||x.tipoResumen)+"</select>";
   const contratistaInput="<select class='editbox"+manual+"' onchange='actualizarFilaManual("+x.__idx+",\\\"contratista\\\",this.value)'>"+opcionesContratista(x.contratista)+"</select>";
+  const estadoTicketInput="<select class='editbox"+manual+"' onchange='actualizarFilaManual("+x.__idx+",\\\"estadoTicket\\\",this.value)'>"+opcionesEstadoTicket(x.estadoTicket)+"</select>";
   const odmInput="<input class='editbox"+manual+"' value='"+esc(x.odm||"")+"' placeholder='Agregar ODM' onchange='actualizarFilaManual("+x.__idx+",\\\"odm\\\",this.value)' onkeydown='if(event.key===\\\"Enter\\\")this.blur()'>";
-  tb.insertAdjacentHTML("beforeend","<tr><td class='mono'>"+esc(x.ticket)+"</td><td>"+tipoInput+"</td><td>"+esc(x.rango)+"</td><td><b>"+esc(x.horas)+"</b></td><td>"+esc(x.horaInicio)+"</td><td>"+contratistaInput+"</td><td>"+esc(x.estadoTicket)+"</td><td class='"+(esRiesgoVida(x)?"risk":"")+"'>"+esc(x.prioridad||"")+"</td><td>"+botonLlamadas(x)+"</td><td style='white-space:pre-line'>"+esc(x.descFalla||"")+"</td><td>"+esc(x.llamante||"")+"</td><td>"+esc(tel)+"</td><td>"+esc(x.aviso)+"</td><td>"+esc(x.suministro)+"</td><td>"+esc(x.horaLlamada)+"</td><td class='mono'>"+esc(x.coordenadas)+"</td><td>"+maps+"</td><td>"+odmInput+"</td><td>"+esc(x.estadoOdm)+"</td><td><span class='badge "+cls+"'>"+esc(x.cruceOdm)+"</span></td><td>"+esc(x.totalOdmsFsm)+"</td><td style='white-space:pre-line'>"+esc(x.detalleOdmsFsm)+"</td><td>"+esc(x.sed)+"</td><td>"+esc(x.alimentador)+"</td><td>"+esc(x.distrito)+"</td><td>"+esc(x.direccion)+"</td></tr>");
+  tb.insertAdjacentHTML("beforeend","<tr><td class='mono'>"+esc(x.ticket)+"</td><td>"+tipoInput+"</td><td>"+esc(x.rango)+"</td><td><b>"+esc(x.horas)+"</b></td><td>"+esc(x.horaInicio)+"</td><td>"+contratistaInput+"</td><td>"+estadoTicketInput+"</td><td class='"+(esRiesgoVida(x)?"risk":"")+"'>"+esc(x.prioridad||"")+"</td><td>"+botonLlamadas(x)+"</td><td style='white-space:pre-line'>"+esc(x.descFalla||"")+"</td><td>"+esc(x.llamante||"")+"</td><td>"+esc(tel)+"</td><td>"+esc(x.aviso)+"</td><td>"+esc(x.suministro)+"</td><td>"+esc(x.horaLlamada)+"</td><td class='mono'>"+esc(x.coordenadas)+"</td><td>"+maps+"</td><td>"+odmInput+"</td><td>"+esc(x.estadoOdm)+"</td><td><span class='badge "+cls+"'>"+esc(x.cruceOdm)+"</span></td><td>"+esc(x.totalOdmsFsm)+"</td><td style='white-space:pre-line'>"+esc(x.detalleOdmsFsm)+"</td><td>"+esc(x.sed)+"</td><td>"+esc(x.alimentador)+"</td><td>"+esc(x.distrito)+"</td><td>"+esc(x.direccion)+"</td></tr>");
  });
 }
 function cambiosParaGuardar(){
  const out={};
  DATA.forEach(function(x){
   if(x.manualEditado==="SI"){
-   out[x.ticket]={contratista:x.contratista,tipoEvento:x.tipoEvento,tipoResumen:x.tipoResumen,odm:x.odm,estadoOdm:x.estadoOdm,cruceOdm:x.cruceOdm,odmActiva:x.odmActiva,asignadoOdm:x.asignadoOdm,manualEditado:"SI"};
+   out[x.ticket]={contratista:x.contratista,tipoEvento:x.tipoEvento,tipoResumen:x.tipoResumen,estadoTicket:x.estadoTicket,odm:x.odm,estadoOdm:x.estadoOdm,cruceOdm:x.cruceOdm,odmActiva:x.odmActiva,asignadoOdm:x.asignadoOdm,manualEditado:"SI"};
   }
  });
  return out;
