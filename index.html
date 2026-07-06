@@ -2755,7 +2755,21 @@ function contratistaPorSet(valor) {
   return contratistaPorSetResponsabilidad[k] || "";
 }
 
-function resolverContratistaPorSet(setValor, alimentador, ptoResponsable, contratistaTicket) {
+function contratistaPorPtoResponsable(ptoResponsable) {
+  const t = cruceKeyNorm(ptoResponsable).toUpperCase();
+  if (!t) return "";
+  if (t.includes("EBTLAR") || t.includes("LARI") || t.includes("LAR")) return "LARI";
+  if (t.includes("EBTINM") || t.includes("INMEL") || t.includes("INM")) return "INMEL";
+  if (t.includes("EBTCOB") || t.includes("COBRA") || t.includes("COB")) return "COBRA";
+  if (t.includes("EBTPAP") || t === "PA" || t.includes("P A") || t.includes("P.A")) return "PA";
+  if (t.includes("EBTDOM") || t.includes("DOMINION") || t.includes("DOM")) return "DOMINION";
+  return "";
+}
+
+function resolverContratistaPorSet(setValor, alimentador, ptoResponsable, contratistaTicket, priorizarPtoResponsable = false) {
+  const porPtoResponsable = contratistaPorPtoResponsable(ptoResponsable);
+  if (priorizarPtoResponsable && porPtoResponsable) return porPtoResponsable;
+
   const porSet = contratistaPorSet(setValor);
   if (porSet) return porSet;
 
@@ -2765,7 +2779,7 @@ function resolverContratistaPorSet(setValor, alimentador, ptoResponsable, contra
   const porAlim = nombreContratistaPorAlim(alimentador, setValor);
   if (porAlim && porAlim !== "SIN ASIGNAR") return normalizarContratistaResumen(porAlim);
 
-  return normalizarContratistaResumen(contratistaTicket || ptoResponsable || "");
+  return normalizarContratistaResumen(contratistaTicket || porPtoResponsable || ptoResponsable || "");
 }
 
 function clasificarTipoResumenPorTexto(valor) {
@@ -3042,7 +3056,7 @@ function ejecutarCruce3Archivos() {
     const objetoTecnico = objetoTecnicoTicket || objetoTecnicoFsm;
     const ptoResponsable = fsmItem ? cruceV(fsmItem.row, cruceFsmCols.responsable) : "";
     const contratistaTicket = cruceV(t, cruceTicketCols.contratista);
-    const contratistaSet = resolverContratistaPorSet(setTicket, cruceV(t, cruceTicketCols.alimentador), ptoResponsable, contratistaTicket);
+    const contratistaSet = resolverContratistaPorSet(setTicket, cruceV(t, cruceTicketCols.alimentador), ptoResponsable, contratistaTicket, !!fsmItem);
     const textoUltimaOdm = fsmItem ? (fsmItem.textoBreve || "") : "";
     const tipoResumen = obtenerTipoResumenAtencion(textoUltimaOdm, objetoTecnico);
 
