@@ -6,13 +6,44 @@
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
 <style>
- body { margin: 0; height: 100vh; display: flex; overflow: hidden; }
-  #sidebar { width: 320px; background: #f8f9fa; padding: 15px; overflow-y: auto; transition: all 0.3s ease; }
-  #sidebar.hidden { transform: translateX(-100%); }
+ body { margin: 0; height: 100vh; display: flex; overflow: hidden; background:#eef3f8; }
+  #sidebar {
+    width: 320px;
+    min-width: 320px;
+    flex: 0 0 320px;
+    background: linear-gradient(180deg, #f8fbff 0%, #eef4fb 100%);
+    padding: 16px 14px 18px;
+    overflow-y: auto;
+    transition: width 0.28s ease, min-width 0.28s ease, flex-basis 0.28s ease, padding 0.28s ease, border-color 0.28s ease, opacity 0.18s ease;
+    border-right: 1px solid #cbd6e2;
+    box-shadow: 8px 0 22px rgba(15, 23, 42, 0.10);
+    color: #0f172a;
+  }
+  #sidebar.hidden {
+    width: 0;
+    min-width: 0;
+    flex-basis: 0;
+    padding-left: 0;
+    padding-right: 0;
+    border-right-color: transparent;
+    opacity: 0;
+    overflow: hidden;
+    box-shadow: none;
+  }
   #map { flex: 1; }
   .fade-in { animation: fadeIn 0.5s ease-in-out; }
   @keyframes fadeIn { from {opacity:0;} to {opacity:1;} }
-  .toggle-btn { position: absolute; top: 10px; left: 10px; z-index: 1000; }
+  .toggle-btn {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    z-index: 1000;
+    width: 42px;
+    height: 42px;
+    border-radius: 9px;
+    border: 1px solid rgba(255,255,255,.35);
+    box-shadow: 0 9px 20px rgba(15, 23, 42, .24);
+  }
   #loginScreen {
     position: fixed; top:0; left:0; width:100%; height:100%;
     background:#0f172a;
@@ -121,6 +152,118 @@
 input[type=range] {
   accent-color: #0d6efd; /* azul bootstrap */
 }
+
+/* Buscador izquierdo con estilo operativo tipo OMS */
+#sidebar h4 {
+  margin: -16px -14px 14px;
+  padding: 17px 14px 15px 56px;
+  min-height: 62px;
+  display: flex;
+  align-items: center;
+  background: linear-gradient(135deg, #0b4f91 0%, #0f6fc6 58%, #0a8f75 100%);
+  color: #ffffff;
+  font-size: 22px;
+  font-weight: 850;
+  letter-spacing: 0;
+  border-bottom: 1px solid rgba(255,255,255,.26);
+  box-shadow: 0 10px 24px rgba(7, 89, 133, .18);
+}
+#sidebar .form-label,
+#sidebar label {
+  color: #26364a;
+  font-size: 13px;
+  font-weight: 750;
+  margin-bottom: 7px;
+}
+#sidebar .mb-3,
+#sidebar #bloqueSuministro,
+#sidebar #bloqueSED,
+#sidebar #bloqueCoord {
+  background: rgba(255,255,255,.82);
+  border: 1px solid #d5dee9;
+  border-radius: 9px;
+  padding: 11px;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, .055);
+}
+#sidebar #progresoBox {
+  display: none;
+}
+#sidebar h5 {
+  margin: 0 0 10px;
+  color: #0b2f57;
+  font-size: 17px;
+  font-weight: 850;
+}
+#sidebar h6 {
+  margin: 12px 0 8px;
+  color: #0b2f57;
+  font-size: 14px;
+  font-weight: 850;
+}
+#sidebar .form-select,
+#sidebar .form-control {
+  border: 1px solid #c6d3e1;
+  border-radius: 7px;
+  color: #172033;
+  background-color: #ffffff;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.75);
+}
+#sidebar .form-select:focus,
+#sidebar .form-control:focus {
+  border-color: #0d6efd;
+  box-shadow: 0 0 0 3px rgba(13,110,253,.14);
+}
+#sidebar .input-group .form-control {
+  height: 40px;
+}
+#sidebar .input-group .btn {
+  min-width: 74px;
+  border-radius: 0 7px 7px 0;
+  font-weight: 800;
+}
+#sidebar .btn-success,
+#sidebar .btn-info,
+#sidebar .btn-warning {
+  border: 0;
+  color: #ffffff;
+  background: linear-gradient(135deg, #0d6efd, #0b8f75);
+}
+#sidebar .btn-outline-primary,
+#sidebar .btn-outline-warning {
+  border-radius: 7px;
+  font-weight: 750;
+  background: #ffffff;
+}
+#sidebar .list-group {
+  border-radius: 9px;
+  overflow: hidden;
+}
+#sidebar .list-group-item {
+  border-color: #e2e8f0;
+  padding: 10px 12px;
+  background: rgba(255,255,255,.9);
+}
+#sidebar #resultado,
+#sidebar #resultadoSED,
+#sidebar #resultadoCoord {
+  padding: 7px 9px;
+  border-radius: 7px;
+  background: #eefdf4;
+  border: 1px solid #bdebd0;
+  font-weight: 650;
+}
+#sidebar #resultado:empty,
+#sidebar #resultadoSED:empty,
+#sidebar #resultadoCoord:empty {
+  display: none;
+}
+#sidebar::-webkit-scrollbar {
+  width: 8px;
+}
+#sidebar::-webkit-scrollbar-thumb {
+  background: #9fb0c3;
+  border-radius: 999px;
+}
 /* Paneles flotantes */
 #panelHerramientas,
 .panel-flotante {
@@ -184,55 +327,206 @@ input[type=range] {
 .panel-float-btn,
 #toggleHerramientasBtn,
 #toggleAtencionesBtn {
-  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.24);
-  border: 1px solid rgba(255,255,255,0.35);
-  transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
+  position: relative;
+  overflow: hidden;
+  min-height: 38px;
+  border: 1px solid rgba(255,255,255,0.42) !important;
+  border-radius: 10px !important;
+  padding: 8px 14px !important;
+  font-weight: 800;
+  letter-spacing: 0;
+  background: linear-gradient(135deg, #0d6efd 0%, #0b74d8 48%, #0b8f75 100%) !important;
+  color: #ffffff !important;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.25), inset 0 1px 0 rgba(255,255,255,.22);
+  backdrop-filter: blur(8px);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease, background 0.18s ease;
+}
+.panel-float-btn::after,
+#toggleHerramientasBtn::after,
+#toggleAtencionesBtn::after {
+  content: "";
+  position: absolute;
+  inset: -45% auto -45% -65%;
+  width: 52%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.62), transparent);
+  transform: skewX(-22deg);
+  opacity: 0;
+  pointer-events: none;
 }
 .panel-float-btn:hover,
 #toggleHerramientasBtn:hover,
 #toggleAtencionesBtn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.30);
-  filter: brightness(1.03);
+  transform: translateY(-3px);
+  box-shadow: 0 17px 34px rgba(15, 23, 42, 0.34), inset 0 1px 0 rgba(255,255,255,.28);
+  filter: saturate(1.08) brightness(1.04);
 }
 .panel-float-btn:active,
 #toggleHerramientasBtn:active,
 #toggleAtencionesBtn:active {
   transform: translateY(0);
-  box-shadow: 0 5px 14px rgba(15, 23, 42, 0.24);
+  box-shadow: 0 7px 16px rgba(15, 23, 42, 0.25);
+}
+#toggleTicketsBtn::before { content: "🎫 "; }
+#toggleMapsBtn::before { content: "🗺️ "; }
+#toggleHerramientasBtn::before { content: ""; }
+#toggleAtencionesBtn {
+  background: linear-gradient(135deg, #0f5fa8 0%, #0d6efd 60%, #22c55e 100%) !important;
+}
+.panel-float-btn.panel-btn-active,
+#toggleHerramientasBtn.panel-btn-active,
+#toggleAtencionesBtn.panel-btn-active {
+  background: linear-gradient(135deg, #e11d48 0%, #f97316 48%, #facc15 100%) !important;
+  border-color: rgba(255,255,255,.72) !important;
+  box-shadow:
+    0 0 0 3px rgba(250, 204, 21, .18),
+    0 0 26px rgba(249, 115, 22, .42),
+    0 16px 36px rgba(15, 23, 42, .34),
+    inset 0 1px 0 rgba(255,255,255,.28);
+  animation: botonActivoPulse 1.8s ease-in-out infinite;
+}
+.panel-float-btn.panel-btn-active::after,
+#toggleHerramientasBtn.panel-btn-active::after,
+#toggleAtencionesBtn.panel-btn-active::after {
+  opacity: 1;
+  animation: botonShine 1.65s ease-in-out infinite;
+}
+@keyframes botonShine {
+  0% { left: -70%; }
+  55%, 100% { left: 120%; }
+}
+@keyframes botonActivoPulse {
+  0%, 100% { filter: brightness(1) saturate(1.05); }
+  50% { filter: brightness(1.12) saturate(1.2); }
+}
+
+body.sidebar-collapsed #panelHerramientas,
+body.sidebar-collapsed .panel-flotante {
+  left: 18px;
+}
+body.sidebar-collapsed #toggleHerramientasBtn,
+body.sidebar-collapsed #toggleMapsBtn,
+body.sidebar-collapsed #toggleTicketsBtn {
+  left: 18px !important;
+}
+body.sidebar-collapsed .toggle-btn {
+  left: 8px;
 }
 
 body.modo-oscuro-mapa #sidebar,
 body.modo-oscuro-mapa #panelHerramientas,
 body.modo-oscuro-mapa .panel-flotante,
 body.modo-oscuro-mapa #panelAtenciones {
-  background: #111827;
-  color: #e5e7eb;
-  border-color: #374151;
+  background: linear-gradient(180deg, #0f172a 0%, #111827 48%, #0b1220 100%);
+  color: #e5edf8;
+  border-color: #334155;
+  box-shadow: 8px 0 28px rgba(0,0,0,.35);
+}
+body.modo-oscuro-mapa #sidebar h4 {
+  background: linear-gradient(135deg, #0b3b70 0%, #0b5cad 54%, #087a68 100%);
+  border-bottom-color: rgba(148, 163, 184, .28);
+  box-shadow: 0 10px 24px rgba(0,0,0,.25);
+}
+body.modo-oscuro-mapa #sidebar .mb-3,
+body.modo-oscuro-mapa #sidebar #bloqueSuministro,
+body.modo-oscuro-mapa #sidebar #bloqueSED,
+body.modo-oscuro-mapa #sidebar #bloqueCoord,
+body.modo-oscuro-mapa #panelHerramientas .card,
+body.modo-oscuro-mapa .panel-flotante .card {
+  background: rgba(15, 23, 42, .86);
+  border-color: #334155;
+  box-shadow: 0 10px 22px rgba(0,0,0,.24);
+}
+body.modo-oscuro-mapa #sidebar .form-label,
+body.modo-oscuro-mapa #sidebar label,
+body.modo-oscuro-mapa #sidebar h5,
+body.modo-oscuro-mapa #sidebar h6 {
+  color: #dbeafe;
 }
 body.modo-oscuro-mapa .card,
 body.modo-oscuro-mapa .google-direccion-box,
 body.modo-oscuro-mapa .cruce-integrado-box,
 body.modo-oscuro-mapa .list-group-item {
-  background: #1f2937;
-  color: #e5e7eb;
-  border-color: #374151;
+  background: #111827;
+  color: #e5edf8;
+  border-color: #334155;
 }
 body.modo-oscuro-mapa .text-muted,
 body.modo-oscuro-mapa .google-direccion-box .mini,
 body.modo-oscuro-mapa .cruce-integrado-box .cruce-mini {
-  color: #9ca3af !important;
+  color: #b7c3d3 !important;
 }
 body.modo-oscuro-mapa .form-control,
 body.modo-oscuro-mapa .form-select {
-  background: #0f172a;
-  color: #e5e7eb;
+  background: #0b1220;
+  color: #f8fafc;
   border-color: #475569;
+}
+body.modo-oscuro-mapa .form-control::placeholder {
+  color: #9fb0c3;
+}
+body.modo-oscuro-mapa .form-control:focus,
+body.modo-oscuro-mapa .form-select:focus {
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, .16);
+}
+body.modo-oscuro-mapa #sidebar #resultado,
+body.modo-oscuro-mapa #sidebar #resultadoSED,
+body.modo-oscuro-mapa #sidebar #resultadoCoord {
+  background: rgba(6, 78, 59, .36);
+  border-color: rgba(52, 211, 153, .42);
+  color: #dcfce7;
+}
+body.modo-oscuro-mapa #sidebar .list-group-item {
+  background: #0b1220;
+  color: #dbeafe;
+}
+body.modo-oscuro-mapa #sidebar .list-group-item a,
+body.modo-oscuro-mapa #sidebar a {
+  color: #60a5fa;
+}
+body.modo-oscuro-mapa .badge.bg-light,
+body.modo-oscuro-mapa .badge.text-bg-light {
+  background: #1e293b !important;
+  color: #e5edf8 !important;
+}
+body.modo-oscuro-mapa .leaflet-tile-pane {
+  filter: brightness(.88) contrast(1.12) saturate(.92);
 }
 body.modo-oscuro-mapa .leaflet-control-zoom a,
 body.modo-oscuro-mapa .leaflet-control-attribution {
-  background: #111827 !important;
-  color: #e5e7eb !important;
+  background: #0b1220 !important;
+  color: #e5edf8 !important;
+  border-color: #334155 !important;
+}
+body.modo-oscuro-mapa .leaflet-control-zoom {
+  border-color: #334155 !important;
+  box-shadow: 0 10px 22px rgba(0,0,0,.34);
+}
+body.modo-oscuro-mapa .sed-label {
+  color: #60a5fa;
+  text-shadow: 0 1px 3px #000, 0 0 8px rgba(96,165,250,.45);
+}
+body.modo-oscuro-mapa .panel-float-btn,
+body.modo-oscuro-mapa #toggleHerramientasBtn,
+body.modo-oscuro-mapa #toggleAtencionesBtn {
+  background: linear-gradient(135deg, rgba(14, 116, 144, .96), rgba(37, 99, 235, .96) 55%, rgba(16, 185, 129, .96)) !important;
+  border-color: rgba(125, 211, 252, .42) !important;
+  box-shadow: 0 14px 34px rgba(0,0,0,.48), 0 0 0 1px rgba(56,189,248,.08), inset 0 1px 0 rgba(255,255,255,.20);
+}
+body.modo-oscuro-mapa .panel-float-btn:hover,
+body.modo-oscuro-mapa #toggleHerramientasBtn:hover,
+body.modo-oscuro-mapa #toggleAtencionesBtn:hover {
+  box-shadow: 0 18px 40px rgba(0,0,0,.56), 0 0 0 3px rgba(56,189,248,.13), inset 0 1px 0 rgba(255,255,255,.24);
+}
+body.modo-oscuro-mapa .panel-float-btn.panel-btn-active,
+body.modo-oscuro-mapa #toggleHerramientasBtn.panel-btn-active,
+body.modo-oscuro-mapa #toggleAtencionesBtn.panel-btn-active {
+  background: linear-gradient(135deg, #dc2626 0%, #f59e0b 55%, #fde047 100%) !important;
+  box-shadow:
+    0 0 0 3px rgba(251, 191, 36, .18),
+    0 0 30px rgba(245, 158, 11, .52),
+    0 18px 42px rgba(0,0,0,.58),
+    inset 0 1px 0 rgba(255,255,255,.26);
 }
 
 
@@ -4442,7 +4736,22 @@ function mostrarStreetViewUltimoPunto() {
   }
   mostrarStreetViewGoogle(punto.lat, punto.lon, punto.etiqueta || "Street View");
 }
-function toggleSidebar(){ sidebar.classList.toggle("hidden"); }
+function toggleSidebar(){
+  if (!sidebar) return;
+  const ocultar = !sidebar.classList.contains("hidden");
+  sidebar.classList.toggle("hidden", ocultar);
+  document.body.classList.toggle("sidebar-collapsed", ocultar);
+
+  if (ocultar && typeof cerrarPanelesFlotantes === "function") {
+    cerrarPanelesFlotantes();
+  }
+
+  setTimeout(() => {
+    if (typeof map !== "undefined" && map && typeof map.invalidateSize === "function") {
+      map.invalidateSize();
+    }
+  }, 320);
+}
 </script>
 <script>
 // --- FUNCION AUXILIAR: calcular distancia (en metros aprox) ---
@@ -4898,6 +5207,7 @@ function cerrarPanelBoton(panel, btn, texto, claseBase = "btn-primary") {
   if (!panel || !btn) return;
   panel.classList.remove("visible");
   btn.textContent = texto;
+  btn.classList.remove("panel-btn-active");
   btn.classList.remove("btn-danger");
   btn.classList.add(claseBase);
 }
@@ -4918,11 +5228,13 @@ function alternarPanelFlotante(nombre, panel, btn, textoAbierto, textoCerrado) {
   if (abrir) {
     panel.classList.add("visible");
     btn.textContent = textoAbierto;
+    btn.classList.add("panel-btn-active");
     btn.classList.remove("btn-primary");
     btn.classList.add("btn-danger");
   } else {
     panel.classList.remove("visible");
     btn.textContent = textoCerrado;
+    btn.classList.remove("panel-btn-active");
     btn.classList.remove("btn-danger");
     btn.classList.add("btn-primary");
   }
@@ -4968,10 +5280,12 @@ btnAtenciones.addEventListener("click", () => {
 
   if (panelAtenciones.classList.contains("visible")) {
     btnAtenciones.textContent = "❌ Cerrar";
+    btnAtenciones.classList.add("panel-btn-active");
     btnAtenciones.classList.remove("btn-secondary");
     btnAtenciones.classList.add("btn-danger");
   } else {
     btnAtenciones.textContent = "📋 Atenciones";
+    btnAtenciones.classList.remove("panel-btn-active");
     btnAtenciones.classList.remove("btn-danger");
     btnAtenciones.classList.add("btn-secondary");
   }
