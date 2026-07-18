@@ -972,6 +972,50 @@ const RADIO_VISUAL_SED = 1000; // metros
 const RADIO_VISUAL_POSTES = 200; // metros
 const MAX_POSTES_RENDER = 120;
 let ultimaReferenciaPostes = null;
+
+let xlsxLoaderPromise = null;
+function cargarScriptDinamico(src) {
+  return new Promise((resolve, reject) => {
+    const existente = document.querySelector(`script[src="${src}"]`);
+    if (existente && typeof XLSX !== "undefined") {
+      resolve();
+      return;
+    }
+    const s = existente || document.createElement("script");
+    if (!existente) {
+      s.src = src;
+      s.async = true;
+      document.head.appendChild(s);
+    }
+    s.addEventListener("load", resolve, { once: true });
+    s.addEventListener("error", () => reject(new Error("No se pudo cargar " + src)), { once: true });
+  });
+}
+
+async function asegurarXlsxDisponible() {
+  if (typeof XLSX !== "undefined") return XLSX;
+  if (!xlsxLoaderPromise) {
+    xlsxLoaderPromise = (async () => {
+      const fuentes = [
+        "https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js",
+        "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"
+      ];
+      let ultimoError = null;
+      for (const src of fuentes) {
+        try {
+          estadoCruce("Cargando libreria Excel...", "warn");
+          await cargarScriptDinamico(src);
+          if (typeof XLSX !== "undefined") return XLSX;
+        } catch (err) {
+          ultimoError = err;
+          console.warn("No se pudo cargar XLSX desde", src, err);
+        }
+      }
+      throw ultimoError || new Error("No cargo la libreria XLSX.");
+    })();
+  }
+  return xlsxLoaderPromise;
+}
 // ============================
 // 📏 COMPARAR DISTANCIAS
 // ============================
@@ -3045,13 +3089,20 @@ function cruceAoaToObjects(aoa, profile) {
 }
 
 async function cruceReadFile(file, profile) {
-  const data = await file.arrayBuffer();
-  const wb = XLSX.read(data, { type: "array", cellDates: true, raw: false, dateNF: "dd/mm/yyyy hh:mm:ss" });
-  const sheetName = wb.SheetNames[0];
-  const ws = wb.Sheets[sheetName];
-  const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "", blankrows: false, raw: false });
-  const parsed = cruceAoaToObjects(aoa, profile);
-  return { sheetName, headers: parsed.headers, rows: parsed.rows, aoa, headerRow: parsed.headerRow };
+  try {
+    await asegurarXlsxDisponible();
+    const data = await file.arrayBuffer();
+    const wb = XLSX.read(data, { type: "array", cellDates: true, raw: false, dateNF: "dd/mm/yyyy hh:mm:ss" });
+    const sheetName = wb.SheetNames[0];
+    if (!sheetName) throw new Error("El archivo no tiene hojas.");
+    const ws = wb.Sheets[sheetName];
+    const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "", blankrows: false, raw: false });
+    if (!aoa.length) throw new Error("La hoja esta vacia.");
+    const parsed = cruceAoaToObjects(aoa, profile);
+    return { sheetName, headers: parsed.headers, rows: parsed.rows, aoa, headerRow: parsed.headerRow };
+  } catch (err) {
+    throw new Error(`No se pudo leer "${file && file.name ? file.name : "archivo"}": ${err.message || err}`);
+  }
 }
 
 function cruceFsmTokens(valor) {
@@ -3345,7 +3396,7 @@ function cruceGetCoordinates(ticketRow, callItem) {
 }
 
 async function leerArchivosCruceSiNecesario() {
-  if (typeof XLSX === "undefined") throw new Error("No cargó la librería XLSX.");
+  await asegurarXlsxDisponible();
   const fTickets = cruceTicketsInput && cruceTicketsInput.files[0];
   const fCalls = cruceCallsInput && cruceCallsInput.files[0];
   const fFsm = cruceFsmInput && cruceFsmInput.files[0];
@@ -3355,12 +3406,12 @@ async function leerArchivosCruceSiNecesario() {
   cruceCallsFileName = fCalls.name;
   cruceFsmFileName = fFsm.name;
 
-  estadoCruce("Leyendo archivos...", "warn");
-  const [tickets, calls, fsm] = await Promise.all([
-    cruceReadFile(fTickets, "tickets"),
-    cruceReadFile(fCalls, "calls"),
-    cruceReadFile(fFsm, "fsm")
-  ]);
+  estadoCruce(`Leyendo 1/3 Tickets activos: <b>${escapeHtml(fTickets.name)}</b>...`, "warn");
+  const tickets = await cruceReadFile(fTickets, "tickets");
+  estadoCruce(`Leyendo 2/3 Fallo cliente / llamadas: <b>${escapeHtml(fCalls.name)}</b>...`, "warn");
+  const calls = await cruceReadFile(fCalls, "calls");
+  estadoCruce(`Leyendo 3/3 Export FSM: <b>${escapeHtml(fFsm.name)}</b>...`, "warn");
+  const fsm = await cruceReadFile(fFsm, "fsm");
 
   cruceTicketHeaders = tickets.headers; cruceTicketsRows = tickets.rows; cruceTicketCols = crucePickTicketColumns(cruceTicketHeaders);
   cruceCallHeaders = calls.headers; cruceCallsRows = calls.rows; cruceCallCols = crucePickCallColumns(cruceCallHeaders);
@@ -3377,8 +3428,10 @@ async function leerArchivosCruceSiNecesario() {
   if (!cruceFsmCols.orden) faltan.push("Orden en FSM");
   if (!cruceFsmCols.estado) faltan.push("Status de usuario en FSM");
   if (faltan.length) throw new Error("Columnas no detectadas: " + faltan.join(", "));
-}
 
+  estadoCruce(`Archivos leidos: tickets ${cruceTicketsRows.length}, llamadas ${cruceCallsRows.length}, FSM ${cruceFsmRows.length}. Cruzando...`, "warn");
+  return true;
+}
 function ejecutarCruce3Archivos() {
   const callsIdx = cruceBuildCallsIndex();
   const fsmIdx = cruceBuildFsmIndex();
