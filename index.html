@@ -4154,14 +4154,21 @@ function guardarCambiosLocal(mostrarAviso){
  localStorage.setItem(DASHBOARD_STORAGE_KEY,JSON.stringify(cambiosParaGuardar()));
  if(mostrarAviso) alert("Cambios guardados.");
 }
+function capturarEdicionesVisibles(){
+ const el=document.activeElement;
+ if(el&&el.matches&&el.matches("#tbody select.editbox,#tbody input.editbox")){
+  el.dispatchEvent(new Event("change",{bubbles:true}));
+ }
+}
 function guardarDashboardCompleto(){
+ if(document.activeElement&&typeof document.activeElement.blur==="function")document.activeElement.blur();
+ capturarEdicionesVisibles();
  guardarCambiosLocal(false);
- mostrarMensajeGuardado("Guardado con éxito. HTML actualizado descargado.");
+ mostrarMensajeGuardado("Guardado con exito. HTML actualizado descargado.");
  const btn=document.getElementById("btnGuardarDashboard");
  if(btn){btn.textContent="Guardado";btn.disabled=true;setTimeout(function(){btn.textContent="Guardar";btn.disabled=false;},1800);}
- setTimeout(function(){descargarDashboardActualizado(false);},180);
-}
-function mostrarMensajeGuardado(mensaje){
+ descargarDashboardActualizado(false);
+}function mostrarMensajeGuardado(mensaje){
  const toast=document.getElementById("saveToast");
  if(!toast){alert(mensaje);return;}
  toast.textContent=mensaje;
