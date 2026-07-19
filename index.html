@@ -194,7 +194,37 @@ input[type=range] {
     inset 0 1px 0 rgba(255,255,255,.12);
 }
 #sidebar #progresoBox {
-  display: none;
+  display: block;
+  margin-bottom: 14px;
+  background: linear-gradient(180deg, rgba(22, 59, 114, .98), rgba(12, 40, 84, .98));
+  border: 1px solid #5f8fd4;
+  border-radius: 7px;
+  padding: 12px;
+  box-shadow: 0 8px 18px rgba(2, 12, 32, .22), inset 0 1px 0 rgba(255,255,255,.12);
+}
+#sidebar #progresoBox .progress {
+  height: 13px;
+  background: #09224a;
+  border: 1px solid #6fa7ea;
+  border-radius: 999px;
+  overflow: hidden;
+}
+#sidebar #progress-bar {
+  background: linear-gradient(90deg, #38bdf8, #0d6efd 55%, #22c55e);
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 13px;
+  text-shadow: 0 1px 1px rgba(0,0,0,.35);
+}
+#sidebar #progreso {
+  margin-bottom: 0;
+  max-height: 118px;
+  overflow-y: auto;
+}
+#sidebar #progreso .list-group-item {
+  padding: 7px 9px;
+  font-size: 12px;
 }
 #sidebar h5 {
   margin: 0 0 10px;
@@ -1375,6 +1405,7 @@ const urls = [
 const sidebar = document.getElementById("sidebar");
 const progreso = document.getElementById("progreso");
 const progresoBox = document.getElementById("progresoBox");
+let progresoHideTimer = null;
 
 const searchBox = document.getElementById("searchBox");
 const resultado = document.getElementById("resultado");
@@ -2031,9 +2062,10 @@ console.log("cargados:", cargados, "de", urls.length);
     li.textContent = "✅ Suministros cargados. Atenciones, detalle SED y técnicos se cargan cuando los uses.";
     progreso.appendChild(li);
 
-    setTimeout(() => {
+    if (progresoHideTimer) clearTimeout(progresoHideTimer);
+    progresoHideTimer = setTimeout(() => {
       progresoBox.style.display = "none";
-    }, 2000);
+    }, 1500);
   }
 }
 // Cargar suministros
@@ -2068,6 +2100,7 @@ urls.forEach(f => {
     li.className = "list-group-item text-danger";
     li.textContent = "❌ Error al cargar " + f.nombre;
     progreso.appendChild(li);
+    actualizarProgreso();
   });
 });
 
