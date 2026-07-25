@@ -631,6 +631,25 @@ body.modo-oscuro-mapa #toggleAtencionesBtn.panel-btn-active {
 .cruce-integrado-box .cruce-ok { color: #198754; font-weight: 700; }
 .cruce-integrado-box .cruce-warn { color: #fd7e14; font-weight: 700; }
 .cruce-integrado-box .cruce-err { color: #dc3545; font-weight: 700; }
+.cruce-file-slot { border: 1px dashed #cbd5e1; border-radius: 8px; padding: 8px; background: #fff; transition: border-color .18s ease, box-shadow .18s ease, background .18s ease; }
+.cruce-file-slot.drag-over { border-color: #0d6efd; background: #eff6ff; box-shadow: 0 0 0 3px rgba(13,110,253,.16); }
+.cruce-file-slot.has-file { border-color: #16a34a; background: #f0fdf4; }
+.cruce-file-name { margin-top: 5px; font-size: 11px; color: #475569; word-break: break-word; }
+.cruce-file-slot.has-file .cruce-file-name { color: #087f5b; font-weight: 700; }
+.cruce-progress-box { display: none; margin: 2px 0 9px; padding: 8px; border: 1px solid #bfdbfe; border-radius: 7px; background: #eff6ff; }
+.cruce-progress-box.visible { display: block; }
+.cruce-progress-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 5px; font-size: 11px; color: #1e3a8a; }
+.cruce-progress-head span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cruce-progress-track { height: 10px; overflow: hidden; border-radius: 999px; background: #dbeafe; box-shadow: inset 0 1px 2px rgba(15, 23, 42, .12); }
+.cruce-progress-bar { width: 0; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #0d6efd, #0ea5a4); transition: width .22s ease; }
+.cruce-progress-box.done { border-color: #86efac; background: #f0fdf4; }
+.cruce-progress-box.done .cruce-progress-head { color: #166534; }
+.cruce-progress-box.error { border-color: #fecaca; background: #fef2f2; }
+.cruce-progress-box.error .cruce-progress-head { color: #991b1b; }
+body.modo-oscuro-mapa .cruce-progress-box { border-color: #315780; background: #102b4a; }
+body.modo-oscuro-mapa .cruce-progress-track { background: #1e3a5f; }
+body.modo-oscuro-mapa .cruce-progress-head { color: #dbeafe; }
+.cruce-drop-hint { margin-top: 4px; font-size: 10px; color: #64748b; }
 
 .google-direccion-box { border: 1px solid #e5e7eb; border-radius: 10px; padding: 10px; background: #f8fafc; }
 .google-direccion-box .mini { font-size: 11px; line-height: 1.35; color: #64748b; }
@@ -925,23 +944,39 @@ body.modo-oscuro-mapa #toggleAtencionesBtn.panel-btn-active {
     <div class="card-body p-2">
       <h6 class="mb-2">🔗 Cruce 3 archivos</h6>
       <div class="cruce-integrado-box mb-2">
-        <div class="mb-2">
+        <div class="mb-2 cruce-file-slot" data-cruce-tipo="tickets">
           <label for="cruceTicketsInput" class="form-label mb-1">1) Tickets activos</label>
-          <input type="file" id="cruceTicketsInput" class="form-control form-control-sm" accept=".xlsx,.xls,.csv">
+          <input type="file" id="cruceTicketsInput" class="form-control form-control-sm" accept=".xlsx,.xls,.csv" data-cruce-tipo="tickets">
+          <div class="cruce-drop-hint">Tambien puedes arrastrar el archivo aqui.</div>
+          <div class="cruce-file-name">Pendiente</div>
         </div>
-        <div class="mb-2">
+        <div class="mb-2 cruce-file-slot" data-cruce-tipo="calls">
           <label for="cruceCallsInput" class="form-label mb-1">2) Fallo del cliente / llamadas</label>
-          <input type="file" id="cruceCallsInput" class="form-control form-control-sm" accept=".xlsx,.xls,.csv">
+          <input type="file" id="cruceCallsInput" class="form-control form-control-sm" accept=".xlsx,.xls,.csv" data-cruce-tipo="calls">
+          <div class="cruce-drop-hint">Tambien puedes arrastrar el archivo aqui.</div>
+          <div class="cruce-file-name">Pendiente</div>
         </div>
-        <div class="mb-2">
+        <div class="mb-2 cruce-file-slot" data-cruce-tipo="fsm">
           <label for="cruceFsmInput" class="form-label mb-1">3) Export FSM</label>
-          <input type="file" id="cruceFsmInput" class="form-control form-control-sm" accept=".xlsx,.xls,.csv">
+          <input type="file" id="cruceFsmInput" class="form-control form-control-sm" accept=".xlsx,.xls,.csv" data-cruce-tipo="fsm">
+          <div class="cruce-drop-hint">Tambien puedes arrastrar el archivo aqui.</div>
+          <div class="cruce-file-name">Pendiente</div>
         </div>
         <button id="btnCruzar3ArchivosMapa" class="btn btn-primary btn-sm w-100 mb-2">🔍 Cruzar y pintar mapa</button>
         <button id="btnExportarCruceMapaExcel" class="btn btn-success btn-sm w-100 mb-2" style="display:none;">📊 Descargar Excel cruce</button>
         <button id="btnExportarInsumosReporteOms" class="btn btn-outline-success btn-sm w-100 mb-2" style="display:none;">📗 Descargar insumos reporte OMS</button>
         <button id="btnExportarActivosJsonRepo" class="btn btn-outline-primary btn-sm w-100 mb-2" style="display:none;">🌐 Descargar data online JSON</button>
         <button id="btnExportarDashboardCruceHtml" class="btn btn-dark btn-sm w-100 mb-2" style="display:none;">Dashboard HTML cruce</button>
+        <div id="cruceProgressBox" class="cruce-progress-box" aria-live="polite">
+          <div class="cruce-progress-head">
+            <span id="cruceProgressText">Preparando cruce...</span>
+            <strong id="cruceProgressPercent">0%</strong>
+          </div>
+          <div class="cruce-progress-track">
+            <div id="cruceProgressBar" class="cruce-progress-bar" role="progressbar"
+                 aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div>
+          </div>
+        </div>
         <div id="estadoCruceMapa" class="cruce-mini">Sube los 3 archivos para generar el cruce y pintar los activos.</div>
       </div>
       <div class="small text-muted">
@@ -1147,9 +1182,104 @@ const btnExportarCruceMapaExcel = document.getElementById("btnExportarCruceMapaE
 const btnExportarInsumosReporteOms = document.getElementById("btnExportarInsumosReporteOms");
 const btnExportarDashboardCruceHtml = document.getElementById("btnExportarDashboardCruceHtml");
 const btnExportarActivosJsonRepo = document.getElementById("btnExportarActivosJsonRepo");
+const cruceProgressBox = document.getElementById("cruceProgressBox");
+const cruceProgressBar = document.getElementById("cruceProgressBar");
+const cruceProgressText = document.getElementById("cruceProgressText");
+const cruceProgressPercent = document.getElementById("cruceProgressPercent");
+const archivosCruceSeleccionados = { tickets: null, calls: null, fsm: null };
+let cruceEnProceso = false;
+let cruceProgressTimer = null;
 
-function resumenArchivoCruce(input, etiqueta) {
-  const file = input && input.files && input.files[0];
+function actualizarProgresoCruce(porcentaje, texto, estado = "") {
+  const valor = Math.max(0, Math.min(100, Math.round(Number(porcentaje) || 0)));
+  if (!cruceProgressBox) return;
+  if (cruceProgressTimer) {
+    clearTimeout(cruceProgressTimer);
+    cruceProgressTimer = null;
+  }
+  cruceProgressBox.classList.add("visible");
+  cruceProgressBox.classList.toggle("done", estado === "done");
+  cruceProgressBox.classList.toggle("error", estado === "error");
+  if (cruceProgressBar) {
+    cruceProgressBar.style.width = valor + "%";
+    cruceProgressBar.setAttribute("aria-valuenow", String(valor));
+  }
+  if (cruceProgressText) cruceProgressText.textContent = texto || "Procesando...";
+  if (cruceProgressPercent) cruceProgressPercent.textContent = valor + "%";
+}
+
+function ocultarProgresoCruce(demora = 0) {
+  if (!cruceProgressBox) return;
+  if (cruceProgressTimer) clearTimeout(cruceProgressTimer);
+  cruceProgressTimer = setTimeout(() => {
+    cruceProgressBox.classList.remove("visible", "done", "error");
+    cruceProgressTimer = null;
+  }, Math.max(0, demora));
+}
+
+function cederRenderCruce() {
+  return new Promise(resolve => {
+    if (typeof requestAnimationFrame === "function") {
+      requestAnimationFrame(() => setTimeout(resolve, 0));
+    } else {
+      setTimeout(resolve, 0);
+    }
+  });
+}
+
+function archivoCruceActual(tipo, input) {
+  return archivosCruceSeleccionados[tipo] || (input && input.files && input.files[0]) || null;
+}
+
+function inputCrucePorTipo(tipo) {
+  return { tickets: cruceTicketsInput, calls: cruceCallsInput, fsm: cruceFsmInput }[tipo] || null;
+}
+
+function resetearCrucePorNuevoArchivo() {
+  cruceResults = [];
+  cruceTicketsRows = [];
+  cruceCallsRows = [];
+  cruceFsmRows = [];
+  if (btnExportarCruceMapaExcel) btnExportarCruceMapaExcel.style.display = "none";
+  if (btnExportarInsumosReporteOms) btnExportarInsumosReporteOms.style.display = "none";
+  if (btnExportarDashboardCruceHtml) btnExportarDashboardCruceHtml.style.display = "none";
+  if (btnExportarActivosJsonRepo) btnExportarActivosJsonRepo.style.display = "none";
+}
+
+function pintarArchivoCruce(tipo) {
+  const input = inputCrucePorTipo(tipo);
+  const file = archivoCruceActual(tipo, input);
+  const slot = document.querySelector(`.cruce-file-slot[data-cruce-tipo="${tipo}"]`);
+  const nameBox = slot && slot.querySelector(".cruce-file-name");
+  if (slot) slot.classList.toggle("has-file", !!file);
+  if (nameBox) {
+    nameBox.innerHTML = file ? `Seleccionado: <b>${escapeHtml(file.name)}</b>` : "Pendiente";
+  }
+}
+
+function registrarArchivoCruce(tipo, file, input) {
+  if (!tipo || !file) return;
+  if (!/\.(xlsx|xls|csv)$/i.test(file.name || "")) {
+    estadoCruce("El archivo debe ser Excel o CSV: .xlsx, .xls o .csv.", "err");
+    return;
+  }
+  archivosCruceSeleccionados[tipo] = file;
+  if (input && window.DataTransfer) {
+    try {
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      input.files = dt.files;
+    } catch (err) {
+      console.warn("No se pudo sincronizar input.files, se usara archivo interno:", err);
+    }
+  }
+  resetearCrucePorNuevoArchivo();
+  pintarArchivoCruce(tipo);
+  actualizarEstadoSeleccionCruce();
+}
+
+function resumenArchivoCruce(input, etiqueta, tipo) {
+  const file = archivoCruceActual(tipo, input);
   if (!file) return `${etiqueta}: pendiente`;
   const mb = file.size ? ` (${(file.size / 1048576).toFixed(1)} MB)` : "";
   return `${etiqueta}: <b>${escapeHtml(file.name)}</b>${mb}`;
@@ -1157,29 +1287,46 @@ function resumenArchivoCruce(input, etiqueta) {
 
 function actualizarEstadoSeleccionCruce() {
   const partes = [
-    resumenArchivoCruce(cruceTicketsInput, "Tickets"),
-    resumenArchivoCruce(cruceCallsInput, "Llamadas"),
-    resumenArchivoCruce(cruceFsmInput, "FSM")
+    resumenArchivoCruce(cruceTicketsInput, "Tickets", "tickets"),
+    resumenArchivoCruce(cruceCallsInput, "Llamadas", "calls"),
+    resumenArchivoCruce(cruceFsmInput, "FSM", "fsm")
   ];
-  const completos = [cruceTicketsInput, cruceCallsInput, cruceFsmInput].every(input => input && input.files && input.files[0]);
+  const completos = !!(archivoCruceActual("tickets", cruceTicketsInput) && archivoCruceActual("calls", cruceCallsInput) && archivoCruceActual("fsm", cruceFsmInput));
+  if (btnCruzar3ArchivosMapa && !cruceEnProceso) btnCruzar3ArchivosMapa.disabled = !completos;
   estadoCruce(`${partes.join("<br>")}<br>${completos ? "Listo para cruzar." : "Selecciona los 3 archivos para continuar."}`, completos ? "ok" : "warn");
 }
 
 [cruceTicketsInput, cruceCallsInput, cruceFsmInput].forEach(input => {
   if (!input) return;
   input.addEventListener("change", () => {
-    cruceResults = [];
-    cruceTicketsRows = [];
-    cruceCallsRows = [];
-    cruceFsmRows = [];
-    if (btnExportarCruceMapaExcel) btnExportarCruceMapaExcel.style.display = "none";
-    if (btnExportarInsumosReporteOms) btnExportarInsumosReporteOms.style.display = "none";
-    if (btnExportarDashboardCruceHtml) btnExportarDashboardCruceHtml.style.display = "none";
-    if (btnExportarActivosJsonRepo) btnExportarActivosJsonRepo.style.display = "none";
-    actualizarEstadoSeleccionCruce();
+    registrarArchivoCruce(input.dataset.cruceTipo, input.files && input.files[0], input);
+  });
+});
+
+document.querySelectorAll(".cruce-file-slot").forEach(slot => {
+  const tipo = slot.dataset.cruceTipo;
+  const input = inputCrucePorTipo(tipo);
+  ["dragenter", "dragover"].forEach(evt => {
+    slot.addEventListener(evt, ev => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      slot.classList.add("drag-over");
+    });
+  });
+  ["dragleave", "drop"].forEach(evt => {
+    slot.addEventListener(evt, ev => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      slot.classList.remove("drag-over");
+    });
+  });
+  slot.addEventListener("drop", ev => {
+    const file = ev.dataTransfer && ev.dataTransfer.files && ev.dataTransfer.files[0];
+    registrarArchivoCruce(tipo, file, input);
   });
 });
 const estadoCruceMapa = document.getElementById("estadoCruceMapa");
+actualizarEstadoSeleccionCruce();
 const googleDireccionInput = document.getElementById("googleDireccionInput");
 const btnBuscarDireccionGoogle = document.getElementById("btnBuscarDireccionGoogle");
 const btnStreetViewUltimoPunto = document.getElementById("btnStreetViewUltimoPunto");
@@ -3480,10 +3627,12 @@ function cruceGetCoordinates(ticketRow, callItem) {
 }
 
 async function leerArchivosCruceSiNecesario() {
+  actualizarProgresoCruce(5, "Preparando lector de Excel...");
+  await cederRenderCruce();
   await asegurarXlsxDisponible();
-  const fTickets = cruceTicketsInput && cruceTicketsInput.files[0];
-  const fCalls = cruceCallsInput && cruceCallsInput.files[0];
-  const fFsm = cruceFsmInput && cruceFsmInput.files[0];
+  const fTickets = archivoCruceActual("tickets", cruceTicketsInput);
+  const fCalls = archivoCruceActual("calls", cruceCallsInput);
+  const fFsm = archivoCruceActual("fsm", cruceFsmInput);
   if (!fTickets || !fCalls || !fFsm) throw new Error("Debes seleccionar los 3 archivos: tickets, llamadas y FSM.");
 
   cruceTicketFileName = fTickets.name;
@@ -3491,11 +3640,23 @@ async function leerArchivosCruceSiNecesario() {
   cruceFsmFileName = fFsm.name;
 
   estadoCruce(`Leyendo 1/3 Tickets activos: <b>${escapeHtml(fTickets.name)}</b>...`, "warn");
+  actualizarProgresoCruce(12, "Leyendo Tickets activos...");
+  await cederRenderCruce();
   const tickets = await cruceReadFile(fTickets, "tickets");
+  actualizarProgresoCruce(32, "Tickets activos cargados");
+  await cederRenderCruce();
   estadoCruce(`Leyendo 2/3 Fallo cliente / llamadas: <b>${escapeHtml(fCalls.name)}</b>...`, "warn");
+  actualizarProgresoCruce(36, "Leyendo Fallo del cliente / llamadas...");
+  await cederRenderCruce();
   const calls = await cruceReadFile(fCalls, "calls");
+  actualizarProgresoCruce(56, "Llamadas cargadas");
+  await cederRenderCruce();
   estadoCruce(`Leyendo 3/3 Export FSM: <b>${escapeHtml(fFsm.name)}</b>...`, "warn");
+  actualizarProgresoCruce(60, "Leyendo Export FSM...");
+  await cederRenderCruce();
   const fsm = await cruceReadFile(fFsm, "fsm");
+  actualizarProgresoCruce(76, "Los 3 archivos fueron cargados");
+  await cederRenderCruce();
 
   cruceTicketHeaders = tickets.headers; cruceTicketsRows = tickets.rows; cruceTicketCols = crucePickTicketColumns(cruceTicketHeaders);
   cruceCallHeaders = calls.headers; cruceCallsRows = calls.rows; cruceCallCols = crucePickCallColumns(cruceCallHeaders);
@@ -3725,18 +3886,27 @@ function aplicarAtencionesActivasEnMapa(items, origen = "data online", totalOrig
 
 async function cruzar3ArchivosYPintarMapa() {
   try {
+    cruceEnProceso = true;
     if (btnCruzar3ArchivosMapa) {
       btnCruzar3ArchivosMapa.disabled = true;
       btnCruzar3ArchivosMapa.textContent = "⏳ Cruzando...";
     }
+    actualizarProgresoCruce(2, "Validando los 3 archivos...");
+    await cederRenderCruce();
     await leerArchivosCruceSiNecesario();
+    actualizarProgresoCruce(82, "Cruzando tickets, llamadas y ODM...");
+    await cederRenderCruce();
     const resultados = ejecutarCruce3Archivos();
+    actualizarProgresoCruce(91, "Preparando atenciones para el mapa...");
+    await cederRenderCruce();
     const items = ordenarPorMasAntiguos(resultados.map(resultadoCruceAItemMapa));
     aplicarAtencionesActivasEnMapa(items, "Cruce 3 archivos", resultados.length);
 
     const observados = resultados.filter(r => !r.hasCall || !r.hasActiveOdm).length;
     const conCoord = atencionesActivasData.length;
     estadoCruce(`✅ Cruce listo: ${resultados.length} tickets evaluados · ${conCoord} pintados · ${observados} observados`, "ok");
+    actualizarProgresoCruce(100, "Cruce completado y mapa actualizado", "done");
+    ocultarProgresoCruce(1800);
 
     if (btnExportarCruceMapaExcel) btnExportarCruceMapaExcel.style.display = "block";
     if (btnExportarInsumosReporteOms) btnExportarInsumosReporteOms.style.display = "block";
@@ -3745,11 +3915,19 @@ async function cruzar3ArchivosYPintarMapa() {
   } catch (err) {
     console.error("❌ Error en cruce integrado:", err);
     estadoCruce("❌ " + escapeHtml(err.message || err), "err");
+    actualizarProgresoCruce(100, "No se pudo completar el cruce", "error");
+    ocultarProgresoCruce(5000);
     alert(err.message || "No se pudo cruzar los archivos.");
   } finally {
+    cruceEnProceso = false;
     if (btnCruzar3ArchivosMapa) {
-      btnCruzar3ArchivosMapa.disabled = false;
       btnCruzar3ArchivosMapa.textContent = "🔍 Cruzar y pintar mapa";
+      const completos = !!(
+        archivoCruceActual("tickets", cruceTicketsInput) &&
+        archivoCruceActual("calls", cruceCallsInput) &&
+        archivoCruceActual("fsm", cruceFsmInput)
+      );
+      btnCruzar3ArchivosMapa.disabled = !completos;
     }
   }
 }
