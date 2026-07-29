@@ -3384,7 +3384,8 @@ function crucePickTicketColumns(cols) {
     contratista: crucePickExact(cols, ["Contratista", "Empresa"]) || crucePickCol(cols, [["contratista"], ["empresa"]]),
     direccion: crucePickExact(cols, ["Dirección", "Direccion"]) || crucePickCol(cols, [["direccion"]]),
     objetoTecnico: crucePickExact(cols, ["Objeto técnico", "Objeto tecnico", "Objeto Técnico", "OBJETO_TECNICO"]) || crucePickCol(cols, [["objeto", "tecnico"], ["tipo", "equipo"], ["equipo", "probable"]]),
-    prioridad: crucePickExact(cols, ["Prioridad"]) || crucePickCol(cols, [["prioridad"]])
+    prioridad: crucePickExact(cols, ["Prioridad"]) || crucePickCol(cols, [["prioridad"]]),
+    notaEspecifica: crucePickExact(cols, ["Nota específica", "Nota especifica"]) || crucePickCol(cols, [["nota", "especifica"]])
   };
 }
 
@@ -3398,7 +3399,7 @@ function crucePickCallColumns(cols) {
     horaAveria: crucePickExact(cols, ["Hora de avería", "Hora de averia"]) || crucePickCol(cols, [["hora", "averia"], ["fecha", "averia"]]),
     aviso: crucePickExact(cols, ["Aviso"]) || crucePickCol(cols, [["aviso"]]),
     suministro: crucePickExact(cols, ["Suministro"]) || crucePickCol(cols, [["suministro"]]),
-    descFalla: crucePickExact(cols, ["Desc. de falla", "Desc falla", "Descripcion de falla", "Descripcion", "Subtipo de incidencia", "Tipo de incidencia", "Motivo", "Detalle"]) || crucePickCol(cols, [["desc", "falla"], ["descripcion", "falla"], ["subtipo", "incidencia"], ["tipo", "incidencia"], ["motivo"], ["detalle"]]),
+    descFalla: crucePickExact(cols, ["Subtipo de incidencia", "Tipo de incidencia", "Motivo", "Detalle", "Desc. de falla", "Desc falla", "Descripcion de falla", "Descripcion"]) || crucePickCol(cols, [["subtipo", "incidencia"], ["tipo", "incidencia"], ["motivo"], ["detalle"], ["desc", "falla"], ["descripcion", "falla"]]),
     direccionContacto: crucePickExact(cols, ["Dirección del contacto", "Direccion del contacto"]) || crucePickCol(cols, [["direccion", "contacto"]]),
     direccion: crucePickExact(cols, ["Dirección", "Direccion"]) || crucePickCol(cols, [["direccion"]], { exclude: ["contacto"] }),
     distrito: crucePickExact(cols, ["Distrito"]) || crucePickCol(cols, [["distrito"]]),
@@ -3835,6 +3836,7 @@ function ejecutarCruce3Archivos() {
     const horaLlamada = callRow ? (cruceV(callRow, cruceCallCols.horaRegistro) || cruceV(callRow, cruceCallCols.horaAveria)) : "";
     const llamadasTicket = cruceV(t, cruceTicketCols.llamadas);
     const descFalla = callRow ? cruceV(callRow, cruceCallCols.descFalla) : "";
+    const notaEspecifica = cruceV(t, cruceTicketCols.notaEspecifica);
     const llamadasDetalle = callMatches.map((cm, idx) => {
       const c = cm.row;
       const tel = cruceCleanPhone(cruceV(c, cruceCallCols.telLlamante)) || cruceCleanPhone(cruceV(c, cruceCallCols.telefono));
@@ -3848,6 +3850,7 @@ function ejecutarCruce3Archivos() {
         suministro: cruceV(c, cruceCallCols.suministro),
         horaLlamada: cruceV(c, cruceCallCols.horaRegistro) || cruceV(c, cruceCallCols.horaAveria),
         descFalla: cruceV(c, cruceCallCols.descFalla),
+        notaEspecifica,
         direccion: cruceV(c, cruceCallCols.direccionContacto) || cruceV(c, cruceCallCols.direccion),
         distrito: cruceV(c, cruceCallCols.distrito),
         latitud: cruceV(c, cruceCallCols.latitud),
@@ -3888,6 +3891,7 @@ function ejecutarCruce3Archivos() {
       suministro: callRow ? cruceV(callRow, cruceCallCols.suministro) : "",
       llamadas: llamadasTicket,
       descFalla,
+      notaEspecifica,
       llamadasDetalle,
       horaLlamada,
       direccionContacto: callRow ? (cruceV(callRow, cruceCallCols.direccionContacto) || cruceV(callRow, cruceCallCols.direccion)) : "",
@@ -3945,6 +3949,7 @@ function resultadoCruceAItemMapa(r, idx) {
   item.horaLlamada = r.horaLlamada;
   item.llamadas = r.llamadas;
   item.descFalla = r.descFalla;
+  item.notaEspecifica = r.notaEspecifica;
   item.llamadasDetalle = r.llamadasDetalle || [];
   item.textoBreveOdm = r.textoBreveFsm || item.textoBreveOdm || "";
   item.contratistaSet = r.contratistaSet || item.contratistaSet || item.contratista;
@@ -4071,7 +4076,7 @@ function cruceExcelHeaders() {
   return [
     ...cruceTicketHeaders,
     "CONTRATISTA_SET", "SET", "OBJETO_TECNICO", "TIPO_RESUMEN",
-    "CRUCE_LLAMADA", "LLAMANTE", "NUMERO_CELULAR", "TEL_LLAMANTE", "TELEFONO_CLIENTE", "AVISO_LLAMADA", "SUMINISTRO_LLAMADA", "LLAMADAS_TICKET", "DESC_FALLA_CLIENTE", "HORA_LLAMADA", "DIRECCION_CONTACTO", "DISTRITO_LLAMADA", "COORDENADAS", "LATITUD_BASE", "LONGITUD_BASE",
+    "CRUCE_LLAMADA", "LLAMANTE", "NUMERO_CELULAR", "TEL_LLAMANTE", "TELEFONO_CLIENTE", "AVISO_LLAMADA", "SUMINISTRO_LLAMADA", "LLAMADAS_TICKET", "DESC_FALLA_CLIENTE", "NOTA_ESPECIFICA", "HORA_LLAMADA", "DIRECCION_CONTACTO", "DISTRITO_LLAMADA", "COORDENADAS", "LATITUD_BASE", "LONGITUD_BASE",
     "CRUCE_ODM", "ODM", "ESTADO_ODM", "TEXTO_BREVE_FSM", "ODM_ACTIVA", "PTO_TBJO_RESPONSABLE", "NIVEL_TENSION_FSM", "TOTAL_ODMS_FSM", "DETALLE_ODMS_FSM"
   ];
 }
@@ -4083,7 +4088,7 @@ function cruceRowsParaExportar() {
     const base = cruceTicketHeaders.map(h => r.raw[h] ?? "");
     const extra = [
       r.contratistaSet, r.setTicket, r.objetoTecnico, r.tipoResumen,
-      r.hasCall ? "CON LLAMADA" : "SIN LLAMADA", r.llamante, r.numeroCelular, r.telLlamante, r.telefonoCliente, r.aviso, r.suministro, r.llamadas, r.descFalla, r.horaLlamada, r.direccionContacto, r.distritoLlamada, r.coordenadas, r.latitudBase, r.longitudBase,
+      r.hasCall ? "CON LLAMADA" : "SIN LLAMADA", r.llamante, r.numeroCelular, r.telLlamante, r.telefonoCliente, r.aviso, r.suministro, r.llamadas, r.descFalla, r.notaEspecifica, r.horaLlamada, r.direccionContacto, r.distritoLlamada, r.coordenadas, r.latitudBase, r.longitudBase,
       r.hasActiveOdm ? "CON ODM ACTIVA" : (r.hasFsm ? (cruceFsmTokens(r.estadoOdm).includes("REA") ? "ODM CERRADA" : "ODM NO ACTIVA") : "SIN REGISTRO FSM"), r.odm, r.estadoOdm, r.textoBreveFsm, r.hasActiveOdm ? "SI" : "NO", r.ptoResponsable, r.nivelTensionFsm, r.totalOdmsFsm, r.detalleOdmsFsm
     ];
     data.push([...base, ...extra]);
@@ -4106,6 +4111,7 @@ function cruceLlamadasActivasRows(resultados = cruceResults) {
         "Tipo evento": r.tipoResumen || "",
         Llamadas: r.llamadas || llamadas.length || "",
         "Desc. falla": ll.descFalla || r.descFalla || "",
+        "Nota específica": ll.notaEspecifica || r.notaEspecifica || "",
         Llamante: ll.llamante || "",
         Telefono: ll.telefono || "",
         "Tel. llamante": ll.telLlamante || "",
@@ -4351,6 +4357,7 @@ function cruceDashboardRows() {
       horaLlamada: r.horaLlamada || "",
       llamadas: r.llamadas || "",
       descFalla: r.descFalla || "",
+      notaEspecifica: r.notaEspecifica || "",
       llamadasDetalle: r.llamadasDetalle || [],
       llamante: r.llamante || "",
       numeroCelular: r.numeroCelular || "",
@@ -4425,7 +4432,7 @@ header{padding:18px 22px;background:#101828;color:white}h1{font-size:22px;margin
     <div><button class="btn btn-light" onclick="limpiarFiltros()">Limpiar filtros</button> <button id="btnGuardarDashboard" class="btn btn-green" onclick="guardarDashboardCompleto()">Guardar</button> <button class="btn btn-blue" onclick="exportarVistaExcel()">Exportar vista Excel</button></div>
   </div>
   <section class="tableWrap"><table><thead><tr>
-    <th>Ticket</th><th>Tipo evento</th><th>Rango</th><th>Horas</th><th>Inicio</th><th>Contratista</th><th>Estado ticket</th><th>Prioridad</th><th>Llamadas</th><th>Desc. falla</th><th>Llamante</th><th>Telefono</th><th>Aviso</th><th>Suministro</th><th>Hora llamada</th><th>Coordenadas</th><th>Maps</th><th>ODM</th><th>Estado ODM</th><th>Cruce ODM</th><th>Total ODMs</th><th>Detalle ODMs FSM</th><th>SED</th><th>Alimentador</th><th>Distrito</th><th>Direccion</th>
+    <th>Ticket</th><th>Tipo evento</th><th>Rango</th><th>Horas</th><th>Inicio</th><th>Contratista</th><th>Estado ticket</th><th>Prioridad</th><th>Llamadas</th><th>Desc. falla</th><th>Nota específica</th><th>Llamante</th><th>Telefono</th><th>Aviso</th><th>Suministro</th><th>Hora llamada</th><th>Coordenadas</th><th>Maps</th><th>ODM</th><th>Estado ODM</th><th>Cruce ODM</th><th>Total ODMs</th><th>Detalle ODMs FSM</th><th>SED</th><th>Alimentador</th><th>Distrito</th><th>Direccion</th>
   </tr></thead><tbody id="tbody"></tbody></table></section>
   <div id="callModal" class="modalMask" onclick="cerrarDetalleLlamadas(event)">
     <div class="modalBox" onclick="event.stopPropagation()">
@@ -4462,7 +4469,7 @@ function filtrados(){
  return DATA.filter(function(x){
   if(estadoTicketCerrado(x)) return false;
   if(c && x.contratista!==c) return false; if(te && (x.tipoEvento||x.tipoResumen)!==te) return false; if(r && x.rango!==r) return false; if(o && x.cruceOdm!==o) return false; if(d && (!x.fechaInicio || x.fechaInicio<d)) return false; if(h && (!x.fechaInicio || x.fechaInicio>h)) return false;
-  if(q){const blob=[x.ticket,x.odm,x.estadoOdm,x.detalleOdmsFsm,x.contratista,x.tipoEvento,x.tipoResumen,x.prioridad,x.sed,x.alimentador,x.distrito,x.direccion,x.suministro,x.aviso,x.llamadas,x.descFalla,x.llamante,x.numeroCelular,x.telLlamante,x.telefonoCliente,x.coordenadas].join(" ").toLowerCase(); if(!blob.includes(q)) return false;}
+  if(q){const blob=[x.ticket,x.odm,x.estadoOdm,x.detalleOdmsFsm,x.contratista,x.tipoEvento,x.tipoResumen,x.prioridad,x.sed,x.alimentador,x.distrito,x.direccion,x.suministro,x.aviso,x.llamadas,x.descFalla,x.notaEspecifica,x.llamante,x.numeroCelular,x.telLlamante,x.telefonoCliente,x.coordenadas].join(" ").toLowerCase(); if(!blob.includes(q)) return false;}
   return true;
  });
 }
@@ -4514,6 +4521,7 @@ function verDetalleLlamadas(idx){
     "<div><small>Celular / telefono</small><span>"+esc(valorTelefonoLlamada(ll))+"</span></div>"+
     "<div><small>Aviso</small><span>"+esc(ll.aviso||x.aviso||"")+"</span></div>"+
     "<div class='callFull'><small>Desc. operador</small><span>"+esc(ll.descFalla||x.descFalla||"")+"</span></div>"+
+    "<div class='callFull'><small>Nota específica</small><span>"+esc(ll.notaEspecifica||x.notaEspecifica||"")+"</span></div>"+
     "<div class='callFull'><small>Direccion</small><span>"+esc(ll.direccion||x.direccion||"")+maps+"</span></div>"+
     "</div></article>";
   }).join("");
@@ -4535,7 +4543,7 @@ function renderTabla(){
   const contratistaInput="<select class='editbox"+manual+"' onchange='actualizarFilaManual("+x.__idx+",\\\"contratista\\\",this.value)'>"+opcionesContratista(x.contratista)+"</select>";
   const estadoTicketInput="<select class='editbox"+manual+"' onchange='actualizarFilaManual("+x.__idx+",\\\"estadoTicket\\\",this.value)'>"+opcionesEstadoTicket(x.estadoTicket)+"</select>";
   const odmInput="<input class='editbox"+manual+"' value='"+esc(x.odm||"")+"' placeholder='Agregar ODM' onchange='actualizarFilaManual("+x.__idx+",\\\"odm\\\",this.value)' onkeydown='if(event.key===\\\"Enter\\\")this.blur()'>";
-  tb.insertAdjacentHTML("beforeend","<tr><td class='mono'>"+esc(x.ticket)+"</td><td>"+tipoInput+"</td><td>"+esc(x.rango)+"</td><td><b>"+esc(x.horas)+"</b></td><td>"+esc(x.horaInicio)+"</td><td>"+contratistaInput+"</td><td>"+estadoTicketInput+"</td><td class='"+(esRiesgoVida(x)?"risk":"")+"'>"+esc(x.prioridad||"")+"</td><td>"+botonLlamadas(x)+"</td><td style='white-space:pre-line'>"+esc(x.descFalla||"")+"</td><td>"+esc(x.llamante||"")+"</td><td>"+esc(tel)+"</td><td>"+esc(x.aviso)+"</td><td>"+esc(x.suministro)+"</td><td>"+esc(x.horaLlamada)+"</td><td class='mono'>"+esc(x.coordenadas)+"</td><td>"+maps+"</td><td>"+odmInput+"</td><td>"+esc(x.estadoOdm)+"</td><td><span class='badge "+cls+"'>"+esc(x.cruceOdm)+"</span></td><td>"+esc(x.totalOdmsFsm)+"</td><td style='white-space:pre-line'>"+esc(x.detalleOdmsFsm)+"</td><td>"+esc(x.sed)+"</td><td>"+esc(x.alimentador)+"</td><td>"+esc(x.distrito)+"</td><td>"+esc(x.direccion)+"</td></tr>");
+  tb.insertAdjacentHTML("beforeend","<tr><td class='mono'>"+esc(x.ticket)+"</td><td>"+tipoInput+"</td><td>"+esc(x.rango)+"</td><td><b>"+esc(x.horas)+"</b></td><td>"+esc(x.horaInicio)+"</td><td>"+contratistaInput+"</td><td>"+estadoTicketInput+"</td><td class='"+(esRiesgoVida(x)?"risk":"")+"'>"+esc(x.prioridad||"")+"</td><td>"+botonLlamadas(x)+"</td><td style='white-space:pre-line'>"+esc(x.descFalla||"")+"</td><td style='white-space:pre-line'>"+esc(x.notaEspecifica||"")+"</td><td>"+esc(x.llamante||"")+"</td><td>"+esc(tel)+"</td><td>"+esc(x.aviso)+"</td><td>"+esc(x.suministro)+"</td><td>"+esc(x.horaLlamada)+"</td><td class='mono'>"+esc(x.coordenadas)+"</td><td>"+maps+"</td><td>"+odmInput+"</td><td>"+esc(x.estadoOdm)+"</td><td><span class='badge "+cls+"'>"+esc(x.cruceOdm)+"</span></td><td>"+esc(x.totalOdmsFsm)+"</td><td style='white-space:pre-line'>"+esc(x.detalleOdmsFsm)+"</td><td>"+esc(x.sed)+"</td><td>"+esc(x.alimentador)+"</td><td>"+esc(x.distrito)+"</td><td>"+esc(x.direccion)+"</td></tr>");
  });
 }
 function cambiosParaGuardar(){
@@ -4633,8 +4641,8 @@ function renderCharts(){
 function limpiarFiltros(){document.querySelectorAll(".filters input,.filters select").forEach(function(el){el.value="";});render();}
 function exportarVistaExcel(){
  if(!vista.length){alert("No hay datos para exportar.");return;}
- const rows=vista.map(function(x){return {"Ticket":x.ticket,"Tipo evento":x.tipoEvento||x.tipoResumen,"Rango horas":x.rango,"Horas atencion":x.horas,"Hora inicio":x.horaInicio,"Contratista":x.contratista,"Estado ticket":x.estadoTicket,"Llamadas":x.llamadas,"Desc. falla":x.descFalla,"Asignado ODM":x.asignadoOdm,"Primer llamante":x.llamante,"Numero celular":x.numeroCelular,"Tel. llamante":x.telLlamante,"Telefono cliente":x.telefonoCliente,"Aviso":x.aviso,"Suministro":x.suministro,"Hora llamada":x.horaLlamada,"Coordenadas":x.coordenadas,"Latitud":x.latitud,"Longitud":x.longitud,"Link Google Maps":x.mapsUrl,"ODM":x.odm,"Estado ODM":x.estadoOdm,"Cruce ODM":x.cruceOdm,"ODM activa":x.odmActiva,"Total ODMs FSM":x.totalOdmsFsm,"Detalle ODMs FSM":x.detalleOdmsFsm,"SED":x.sed,"Alimentador":x.alimentador,"Distrito":x.distrito,"Direccion":x.direccion,"Prioridad":x.prioridad};});
- const llamadasRows=[]; vista.forEach(function(x){const llamadas=Array.isArray(x.llamadasDetalle)?x.llamadasDetalle:[]; llamadas.forEach(function(ll,i){llamadasRows.push({"Ticket":x.ticket,"Nro llamada":ll.nro||i+1,"Hora inicio ticket":x.horaInicio,"Estado ticket":x.estadoTicket,"Prioridad":x.prioridad,"Contratista":x.contratista,"Tipo evento":x.tipoEvento||x.tipoResumen,"Llamadas":x.llamadas||llamadas.length,"Desc. falla":ll.descFalla||x.descFalla,"Llamante":ll.llamante||"","Telefono":ll.telefono||"","Tel. llamante":ll.telLlamante||"","Telefono cliente":ll.telefonoCliente||"","Aviso":ll.aviso||"","Suministro":ll.suministro||"","Hora llamada":ll.horaLlamada||"","Distrito":ll.distrito||x.distrito,"Direccion":ll.direccion||x.direccion,"SED":x.sed,"Alimentador":x.alimentador,"Coordenadas":ll.coordenadas||x.coordenadas,"Latitud":ll.latitud||x.latitud,"Longitud":ll.longitud||x.longitud,"Link Google Maps":x.mapsUrl});});});
+ const rows=vista.map(function(x){return {"Ticket":x.ticket,"Tipo evento":x.tipoEvento||x.tipoResumen,"Rango horas":x.rango,"Horas atencion":x.horas,"Hora inicio":x.horaInicio,"Contratista":x.contratista,"Estado ticket":x.estadoTicket,"Llamadas":x.llamadas,"Desc. falla":x.descFalla,"Nota específica":x.notaEspecifica,"Asignado ODM":x.asignadoOdm,"Primer llamante":x.llamante,"Numero celular":x.numeroCelular,"Tel. llamante":x.telLlamante,"Telefono cliente":x.telefonoCliente,"Aviso":x.aviso,"Suministro":x.suministro,"Hora llamada":x.horaLlamada,"Coordenadas":x.coordenadas,"Latitud":x.latitud,"Longitud":x.longitud,"Link Google Maps":x.mapsUrl,"ODM":x.odm,"Estado ODM":x.estadoOdm,"Cruce ODM":x.cruceOdm,"ODM activa":x.odmActiva,"Total ODMs FSM":x.totalOdmsFsm,"Detalle ODMs FSM":x.detalleOdmsFsm,"SED":x.sed,"Alimentador":x.alimentador,"Distrito":x.distrito,"Direccion":x.direccion,"Prioridad":x.prioridad};});
+ const llamadasRows=[]; vista.forEach(function(x){const llamadas=Array.isArray(x.llamadasDetalle)?x.llamadasDetalle:[]; llamadas.forEach(function(ll,i){llamadasRows.push({"Ticket":x.ticket,"Nro llamada":ll.nro||i+1,"Hora inicio ticket":x.horaInicio,"Estado ticket":x.estadoTicket,"Prioridad":x.prioridad,"Contratista":x.contratista,"Tipo evento":x.tipoEvento||x.tipoResumen,"Llamadas":x.llamadas||llamadas.length,"Desc. falla":ll.descFalla||x.descFalla,"Nota específica":ll.notaEspecifica||x.notaEspecifica||"","Llamante":ll.llamante||"","Telefono":ll.telefono||"","Tel. llamante":ll.telLlamante||"","Telefono cliente":ll.telefonoCliente||"","Aviso":ll.aviso||"","Suministro":ll.suministro||"","Hora llamada":ll.horaLlamada||"","Distrito":ll.distrito||x.distrito,"Direccion":ll.direccion||x.direccion,"SED":x.sed,"Alimentador":x.alimentador,"Coordenadas":ll.coordenadas||x.coordenadas,"Latitud":ll.latitud||x.latitud,"Longitud":ll.longitud||x.longitud,"Link Google Maps":x.mapsUrl});});});
  const wb=XLSX.utils.book_new(); const ws=XLSX.utils.json_to_sheet(rows); ws["!cols"]=Object.keys(rows[0]).map(function(k){return {wch:Math.min(Math.max(k.length+4,12),42)};}); XLSX.utils.book_append_sheet(wb,ws,"VISTA_FILTRADA"); const llamadasFinal=llamadasRows.length?llamadasRows:[{"Mensaje":"No hay llamadas asociadas a los tickets activos filtrados."}]; const wsLlamadas=XLSX.utils.json_to_sheet(llamadasFinal); wsLlamadas["!cols"]=Object.keys(llamadasFinal[0]).map(function(k){return {wch:Math.min(Math.max(k.length+4,12),46)};}); XLSX.utils.book_append_sheet(wb,wsLlamadas,"LLAMADAS_ACTIVAS"); XLSX.writeFile(wb,"Dashboard_Tickets_Activos_Filtrado.xlsx");
 }
 init();
@@ -4673,7 +4681,7 @@ function activosParaJsonRepositorio() {
       suministro: x.suministro || "", direccion: x.direccion || "",
       horaInicio: x.horaInicio || "", fechaInicioMs: x.fechaInicioMs || null,
       llamante: x.llamante || "", numeroCelular: x.numeroCelular || "", aviso: x.aviso || "", horaLlamada: x.horaLlamada || "",
-      llamadas: x.llamadas || "", descFalla: x.descFalla || "",
+      llamadas: x.llamadas || "", descFalla: x.descFalla || "", notaEspecifica: x.notaEspecifica || "",
       llamadasDetalle: x.llamadasDetalle || [],
       ptoResponsable: x.ptoResponsable || "", nivelTensionFsm: x.nivelTensionFsm || ""
     }))
