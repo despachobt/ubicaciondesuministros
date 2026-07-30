@@ -727,6 +727,34 @@ body.modo-oscuro-mapa .cruce-all-status { color: #dbeafe; }
   color: #475569;
 }
 
+.map-action-btn {
+  min-height: 38px;
+  transition: color .18s ease, background-color .18s ease, border-color .18s ease, box-shadow .18s ease, transform .18s ease;
+}
+
+.map-action-btn:hover,
+.map-action-btn:focus-visible {
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+.google-action-btn:hover,
+.google-action-btn:focus-visible {
+  background-color: #0d6efd;
+  border-color: #66a3ff;
+  box-shadow: 0 0 0 2px rgba(13, 110, 253, .22), 0 0 16px rgba(13, 110, 253, .72);
+}
+
+.smallworld-action-btn:hover,
+.smallworld-action-btn:focus-visible {
+  background-color: #008c95;
+  border-color: #42d5dc;
+  box-shadow: 0 0 0 2px rgba(0, 140, 149, .22), 0 0 16px rgba(0, 200, 210, .72);
+}
+
+.map-action-btn:active {
+  transform: translateY(0);
+}
 </style>
 </head>
 <body>
@@ -787,7 +815,8 @@ body.modo-oscuro-mapa .cruce-all-status { color: #dbeafe; }
       <button class="btn btn-success" onclick="buscarSuministro()">Buscar</button>
     </div>
     <div id="resultado" class="text-success mb-2"></div>
-    <button id="verEnGoogle" class="btn btn-outline-primary btn-sm mb-3" style="display:none" onclick="abrirEnGoogleMaps()">Ver en Google Maps</button>
+    <button id="verEnGoogle" class="btn btn-outline-primary btn-sm mb-3 map-action-btn google-action-btn" style="display:none" onclick="abrirEnGoogleMaps()">Ver en Google Maps</button>
+    <button id="btnSmallworldSuministro" class="btn btn-outline-primary btn-sm mb-3 map-action-btn smallworld-action-btn" style="display:none" onclick="abrirBusquedaSmallworld('suministro')">Abrir en Smallworld</button>
     <h6>📍 Suministros cercanos:</h6>
     <ul id="cercanos" class="list-group small mb-3"></ul>
   </div>
@@ -800,7 +829,8 @@ body.modo-oscuro-mapa .cruce-all-status { color: #dbeafe; }
       <button class="btn btn-warning" onclick="buscarSED()">Buscar</button>
     </div>
     <div id="resultadoSED" class="text-primary mb-2"></div>
-    <button id="verEnGoogleSED" class="btn btn-outline-warning btn-sm mb-3" style="display:none" onclick="abrirEnGoogleMapsSED()">Ver en Google Maps</button>
+    <button id="verEnGoogleSED" class="btn btn-outline-warning btn-sm mb-3 map-action-btn google-action-btn" style="display:none" onclick="abrirEnGoogleMapsSED()">Ver en Google Maps</button>
+    <button id="btnSmallworldSED" class="btn btn-outline-primary btn-sm mb-3 map-action-btn smallworld-action-btn" style="display:none" onclick="abrirBusquedaSmallworld('sed')">Abrir en Smallworld</button>
     <h6>📍 Suministros cercanos:</h6>
     <ul id="cercanosSED" class="list-group small mb-3"></ul>
   </div>
@@ -1184,6 +1214,32 @@ let modoOscuroMapa = false;
 const btnRespAlim = document.getElementById("btnRespAlim");
 const btnTecnicos = document.getElementById("btnTecnicos");
 const btnModoOscuroMapa = document.getElementById("btnModoOscuroMapa");
+
+function abrirBusquedaSmallworld(tipo) {
+  const esSuministro = tipo === "suministro";
+  const valor = (document.getElementById(esSuministro ? "searchBox" : "searchSED")?.value || "").trim();
+  if (!valor) return;
+
+  const ventana = window.open("https://geopluz.pluz.corp/eo_web/index.html", "_blank");
+  if (ventana) ventana.opener = null;
+
+  const copiarAlternativo = () => {
+    const temporal = document.createElement("textarea");
+    temporal.value = valor;
+    temporal.style.position = "fixed";
+    temporal.style.opacity = "0";
+    document.body.appendChild(temporal);
+    temporal.select();
+    document.execCommand("copy");
+    temporal.remove();
+  };
+
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(valor).catch(copiarAlternativo);
+  } else {
+    copiarAlternativo();
+  }
+}
 
 // ============================
 // 📂 BOTONES ATENCIONES ACTIVAS DESDE EXCEL
@@ -1617,6 +1673,38 @@ function obtenerReferenciaSedActual() {
   return null;
 }
 
+function crearFormaSED(obj, colorSED) {
+  const codigo = String(obj.sed || "").trim().toUpperCase();
+  const terminacion = codigo.slice(-1);
+  const estilo = {
+    color: colorSED,
+    weight: 2,
+    opacity: 1,
+    fillColor: colorSED,
+    fillOpacity: 0.28
+  };
+
+  if (terminacion === "A") {
+    return L.polygon([
+      [obj.lat + 0.000065, obj.lon],
+      [obj.lat - 0.000055, obj.lon - 0.000065],
+      [obj.lat - 0.000055, obj.lon + 0.000065]
+    ], estilo);
+  }
+
+  if (terminacion === "C") {
+    return L.rectangle([
+      [obj.lat - 0.000043, obj.lon - 0.000075],
+      [obj.lat + 0.000043, obj.lon + 0.000075]
+    ], estilo);
+  }
+
+  return L.rectangle([
+    [obj.lat - 0.000052, obj.lon - 0.000052],
+    [obj.lat + 0.000052, obj.lon + 0.000052]
+  ], estilo);
+}
+
 function pintarSEDsCercanas(latRef, lonRef) {
   sedLayer.clearLayers();
 
@@ -1627,15 +1715,10 @@ function pintarSEDsCercanas(latRef, lonRef) {
     const contratistaSED = nombreContratistaPorAlim(obj.alim, obj.sed);
     const colorSED = colorPorContratista(contratistaSED);
 
-    const rect = L.rectangle(
-      [
-        [obj.lat - 0.00005, obj.lon - 0.00005],
-        [obj.lat + 0.00005, obj.lon + 0.00005]
-      ],
-      { color: colorSED, weight: 2, fillOpacity: 0.65 }
-    ).bindTooltip(`SED: ${obj.sed}<br>ALIM: ${obj.alim}<br>Contratista: ${contratistaSED}<br>Distancia: ${dMetros.toFixed(1)} m`);
+    const formaSED = crearFormaSED(obj, colorSED)
+      .bindTooltip(`SED: ${obj.sed}<br>ALIM: ${obj.alim}<br>Contratista: ${contratistaSED}<br>Distancia: ${dMetros.toFixed(1)} m`);
 
-    sedLayer.addLayer(rect);
+    sedLayer.addLayer(formaSED);
 
     const labelIcon = L.divIcon({
       className: "sed-label",
@@ -1676,15 +1759,10 @@ document.getElementById("btnSED").addEventListener("click", () => {
       const colorSED = colorPorContratista(contratistaSED);
 
       // 🔹 Rectángulo SED pintado por contratista responsable
-      const rect = L.rectangle(
-        [
-          [obj.lat - 0.00005, obj.lon - 0.00005],
-          [obj.lat + 0.00005, obj.lon + 0.00005]
-        ],
-        { color: colorSED, weight: 2, fillOpacity: 0.65 }
-      ).bindTooltip(`SED: ${obj.sed}<br>ALIM: ${obj.alim}<br>Contratista: ${contratistaSED}`);
+      const formaSED = crearFormaSED(obj, colorSED)
+        .bindTooltip(`SED: ${obj.sed}<br>ALIM: ${obj.alim}<br>Contratista: ${contratistaSED}`);
 
-      sedLayer.addLayer(rect);
+      sedLayer.addLayer(formaSED);
 
       // 🔹 Etiqueta con nombre de SED
       const labelIcon = L.divIcon({
@@ -5523,6 +5601,7 @@ function buscarSuministro() {
                          🗂️ ${encontrado.ut}`;
 
     verEnGoogle.style.display = "inline";
+    document.getElementById("btnSmallworldSuministro").style.display = "inline";
     actualizarMapa(encontrado.lat, encontrado.lon, encontrado);
     ultimoClienteBuscadoAtenciones = encontrado.cliente;
 
@@ -5553,6 +5632,7 @@ function buscarSuministro() {
   } else {
     resultado.textContent = "❌ Suministro no encontrado";
     verEnGoogle.style.display = "none";
+    document.getElementById("btnSmallworldSuministro").style.display = "none";
   }
 }
 
@@ -5572,6 +5652,7 @@ function buscarSED() {
     const alimTexto = encontrado.alim ? ` (${encontrado.alim})` : "";
     resultadoSED.innerHTML = `✅ Encontrado SED <b>${encontrado.sed}</b>${alimTexto}<br>👷 ${htmlResponsabilidadAlim(encontrado.alim, encontrado.sed)}`;
     verEnGoogleSED.style.display = "inline";
+    document.getElementById("btnSmallworldSED").style.display = "inline";
 
 // --- Botón para ver detalle de SED ---
 let btnDetalle = document.getElementById("btnDetalleSED");
@@ -5586,7 +5667,8 @@ if (!btnDetalle) {
   btnDetalle.onclick = () => mostrarDetalleSED(encontrado.sed);
   btnDetalle.style.display = "inline";
 }
-    marker = L.marker([encontrado.lat, encontrado.lon],{title:"SED "+encontrado.sed}).addTo(map);
+    const colorSEDEncontrada = colorPorContratista(nombreContratistaPorAlim(encontrado.alim, encontrado.sed));
+    marker = crearFormaSED(encontrado, colorSEDEncontrada).addTo(map);
     guardarUltimoPuntoGoogle(encontrado.lat, encontrado.lon, `SED ${encontrado.sed || ""}`.trim());
     guardarReferenciaSed(encontrado.lat, encontrado.lon, `SED ${encontrado.sed || ""}`.trim());
     marker.bindTooltip(`SED: ${encontrado.sed}<br>ALIM: ${encontrado.alim}<br>Contratista: ${nombreContratistaPorAlim(encontrado.alim, encontrado.sed)}<br>UT: ${encontrado.ut}`).openTooltip();
@@ -5635,6 +5717,7 @@ marker.on("click", () => {
   } else {
     resultadoSED.textContent = "❌ SED no encontrada";
     verEnGoogleSED.style.display = "none";
+    document.getElementById("btnSmallworldSED").style.display = "none";
   }
 }
 
